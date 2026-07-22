@@ -853,7 +853,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.3.0</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.3.1</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1266,6 +1266,7 @@
       triggeredThresholds: new Set(),
       cardsAdvanced: 0,
       correctCount: 0,          // 정답 누적 (광기의 축복 트리거용)
+      failEvents: 0,            // 룰렛 이벤트 누적 (자비 곡선 계산용)
       streakBonus: 0,           // 정답당 추가 스트릭 (기본 +1에 더해짐)
       hasImperfectMemory: false,
       hasPerfectMemory: false,
@@ -1554,6 +1555,7 @@
   function renderAll() {
     updateStats();
     updateButtons();
+    updateRouletteSub();
     renderMemoryHint();
     renderProphecyHint();
     renderNextAugmentHint();
@@ -1607,19 +1609,44 @@
     });
   }
 
-  // 6개 챔버 그리기
-  function buildCylinder() {
+  // 자비 곡선: 몇 번째 룰렛 이벤트냐에 따라 기본 위험도가 달라진다.
+  // 1~2회차: 총알 0발 (절대 사망 없음)
+  // 3회차: 1발 / 10챔버 (10%)
+  // 4회차: 1발 / 8챔버 (12.5%)
+  // 5회차~: 1발 / 6챔버 (16.7%)
+  // 증강 저주 총알은 이 기본값에 추가된다.
+  function mercyForFailure(n) {
+    if (n <= 2) return { bullets: 0, chambers: 6 };
+    if (n === 3) return { bullets: 1, chambers: 10 };
+    if (n === 4) return { bullets: 1, chambers: 8 };
+    return { bullets: 1, chambers: 6 };
+  }
+
+  // 다음 실패 시 위험도를 룰렛 패널에 미리 보여준다 (평상시 문구)
+  function updateRouletteSub() {
+    const m = mercyForFailure(augmentState.failEvents + 1);
+    const b = Math.min(m.bullets + augmentState.bulletCurses, m.chambers - 1);
+    rouletteSub.textContent = b === 0
+      ? '🍀 지금 실패해도 총알 0발 — 안전'
+      : `다음 실패: 총알 ${b}발 / ${m.chambers}챔버`;
+  }
+
+  // 챔버 그리기 (개수 가변)
+  let currentChambers = 6;
+  function buildCylinder(count = 6) {
+    currentChambers = count;
     const ns = 'http://www.w3.org/2000/svg';
     chambersGroup.innerHTML = '';
     const cx = 100, cy = 100, r = 62;
-    for (let i = 0; i < TOTAL_CHAMBERS; i++) {
-      const angle = (i * 60 * Math.PI) / 180;
+    const chamberR = count <= 6 ? 16 : count <= 8 ? 14 : 12;
+    for (let i = 0; i < count; i++) {
+      const angle = (i * (360 / count) * Math.PI) / 180;
       const x = cx + r * Math.sin(angle);
       const y = cy - r * Math.cos(angle);
       const circle = document.createElementNS(ns, 'circle');
       circle.setAttribute('cx', x);
       circle.setAttribute('cy', y);
-      circle.setAttribute('r', 16);
+      circle.setAttribute('r', chamberR);
       circle.setAttribute('class', 'chamber');
       chambersGroup.appendChild(circle);
     }
@@ -1627,8 +1654,9 @@
 
   function spinCylinder(landedIndex) {
     return new Promise((resolve) => {
+      const step = 360 / currentChambers;
       const extraTurns = 4 + Math.floor(Math.random() * 3);
-      const targetNormalized = (360 - landedIndex * 60) % 360;
+      const targetNormalized = (360 - landedIndex * step) % 360;
       const currentNormalized = ((cylinderRotation % 360) + 360) % 360;
       let delta = targetNormalized - currentNormalized;
       if (delta <= 0) delta += 360;
@@ -1675,40 +1703,45 @@
   // 총알이 있으면 사망. 화면에 보이는 총알 수 = 실제 확률이라 표시와
   // 결과가 어긋나는 버그가 원천적으로 없다.
   // forced(강제 생존/사망)는 착탄 챔버를 조건에 맞는 곳으로 고른다.
-  async function playRoulette(forced) {
+  async function playRoulette(forced, failNum) {
     rouletteBusy = true;
     spinFunBtn.disabled = true;
-    const chambers = chambersGroup.querySelectorAll('.chamber');
-    chambers.forEach((c) => c.classList.remove('bullet', 'empty'));
-    rouletteResult.textContent = '';
-    rouletteResult.className = 'roulette-result';
-    roulettePanel.classList.remove('shake');
 
-    // 장전할 총알 수 = 기본 1 + 영구 저주 + 1회성 보너스
-    let bullets = 1 + augmentState.bulletCurses;
+    // 자비 곡선 기반 총알 수 + 챔버 수 계산
+    const mercy = mercyForFailure(failNum);
+    const chamberCount = mercy.chambers;
+    let bullets = mercy.bullets + augmentState.bulletCurses;
     if (forced && forced.doubleVisual) bullets = Math.max(bullets, 2);
+    if (forced && forced.died) bullets = Math.max(bullets, 1); // 즉사 계약은 최소 1발
     if (!forced && augmentState.pendingBulletBonus > 0) {
       bullets += augmentState.pendingBulletBonus;
       augmentState.pendingBulletBonus = 0;
     }
-    bullets = Math.min(bullets, TOTAL_CHAMBERS - 1); // 최소 1칸은 비워둔다
+    bullets = Math.min(bullets, chamberCount - 1); // 최소 1칸은 비워둔다
+
+    buildCylinder(chamberCount);
+    const chambers = chambersGroup.querySelectorAll('.chamber');
+    rouletteResult.textContent = '';
+    rouletteResult.className = 'roulette-result';
+    roulettePanel.classList.remove('shake');
 
     // 실제 장전
-    const bulletSet = new Set(shufflePick([0, 1, 2, 3, 4, 5], bullets));
+    const indices = Array.from({ length: chamberCount }, (_, i) => i);
+    const bulletSet = new Set(shufflePick(indices, bullets));
 
     // 착탄 챔버 결정
     let landedIndex;
     if (forced) {
-      const candidates = [0, 1, 2, 3, 4, 5].filter((i) => bulletSet.has(i) === forced.died);
+      const candidates = indices.filter((i) => bulletSet.has(i) === forced.died);
       landedIndex = candidates[Math.floor(Math.random() * candidates.length)];
     } else {
-      landedIndex = Math.floor(Math.random() * TOTAL_CHAMBERS);
+      landedIndex = Math.floor(Math.random() * chamberCount);
     }
     const died = bulletSet.has(landedIndex);
 
-    rouletteSub.textContent = bullets > 1
-      ? `총알 ${bullets}발 장전... 방아쇠를 당깁니다...`
-      : '총알 1발 장전... 방아쇠를 당깁니다...';
+    rouletteSub.textContent = bullets === 0
+      ? '🍀 아직 총알이 없습니다... 방아쇠를 당깁니다'
+      : `총알 ${bullets}발 / ${chamberCount}챔버... 방아쇠를 당깁니다...`;
 
     sfx('spin');
     await spinCylinder(landedIndex);
@@ -1728,14 +1761,16 @@
       sfx('death');
     } else {
       landed.classList.add('empty');
-      rouletteResult.textContent = '😮‍💨 찰칵... 생존했습니다';
+      rouletteResult.textContent = bullets === 0
+        ? '🍀 찰칵! 총알이 없었습니다'
+        : '😮‍💨 찰칵... 생존했습니다';
       rouletteResult.classList.add('survive');
       fx.flash('rgba(255,255,255,0.18)', 250);
       sfx('survive');
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1200));
-    rouletteSub.textContent = '틀리면 방아쇠를 당깁니다';
+    updateRouletteSub();
     rouletteBusy = false;
     spinFunBtn.disabled = false;
     return died;
@@ -1763,14 +1798,18 @@
   }
 
   // 룰렛 이벤트 1건 처리(방아쇠 횟수 반영 + 불사조). 최종 사망 여부 반환.
+  // failEvents는 이벤트당 1회만 증가 — 같은 이벤트의 연속 방아쇠(예언/도박사)는
+  // 같은 자비 단계를 쓴다.
   async function resolveRouletteEvent() {
+    augmentState.failEvents++;
+    const failNum = augmentState.failEvents;
     const forced = consumeForcedBlock();
     let pulls = 1;
     if (augmentState.hasProphecy) pulls++;
     if (augmentState.hasGamblersBlood) pulls++;
     let died = false;
     for (let i = 0; i < pulls; i++) {
-      died = await playRoulette(forced);
+      died = await playRoulette(forced, failNum);
       if (died) break;
     }
     died = await tryPhoenix(died);
@@ -1827,7 +1866,7 @@
     const landedIndex = Math.floor(Math.random() * chambers.length);
     await spinCylinder(landedIndex);
 
-    rouletteSub.textContent = '틀리면 방아쇠를 당깁니다';
+    updateRouletteSub();
     rouletteBusy = false;
     spinFunBtn.disabled = false;
   }
@@ -2056,8 +2095,8 @@
     chambersGroup.querySelectorAll('.chamber').forEach((c) => c.classList.remove('bullet', 'empty'));
     rouletteResult.textContent = '';
     rouletteResult.className = 'roulette-result';
-    rouletteSub.textContent = '틀리면 방아쇠를 당깁니다';
     roulettePanel.classList.remove('shake');
+    buildCylinder(6);
     renderAll();
     upBtn.disabled = true;
     downBtn.disabled = true;
