@@ -23,7 +23,6 @@
     padding: 20px;
   }
   h1 { margin-bottom: 4px; }
-  .subtitle { color: #aaa; margin-bottom: 24px; max-width: 640px; text-align: center; }
 
   .layout {
     display: flex;
@@ -141,15 +140,84 @@
     font-size: 16px;
   }
 
-  .memory-hint, .prophecy-hint {
+  .prophecy-hint {
     font-size: 15px;
-    color: #9ad;
+    color: #c9a;
     text-align: center;
     max-width: 420px;
     margin: 2px 0;
+    display: none;
   }
-  .memory-hint { display: none; }
-  .prophecy-hint { display: none; color: #c9a; }
+
+  /* Remaining-card memory hint, shown as actual card visuals instead of text */
+  .memory-hint {
+    display: none;
+    max-width: 420px;
+    margin: 4px 0;
+    gap: 4px;
+  }
+  .memory-hint.show-cards { display: flex; flex-wrap: wrap; justify-content: center; }
+  .memory-hint.show-fog { display: flex; align-items: flex-end; justify-content: center; gap: 28px; }
+
+  .memory-card {
+    width: 26px;
+    height: 36px;
+    border-radius: 6px;
+    background: #fff;
+    color: #1e1e2e;
+    font-weight: 800;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    flex-shrink: 0;
+  }
+  .memory-card.empty {
+    background: #3a3a4a;
+    color: #555;
+    opacity: 0.4;
+  }
+  .memory-card .count-badge {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    background: #ffd166;
+    color: #1e1e2e;
+    font-size: 10px;
+    font-weight: 800;
+    border-radius: 999px;
+    min-width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .fog-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .fog-stack .fog-bar {
+    width: 38px;
+    border-radius: 8px 8px 4px 4px;
+    background: linear-gradient(180deg, #5c5c7a, #33334a);
+    transition: height 0.3s ease;
+  }
+  .fog-stack.bigger .fog-bar {
+    background: linear-gradient(180deg, #9ad, #5a8fc9);
+    box-shadow: 0 0 14px rgba(120, 170, 220, 0.5);
+  }
+  .fog-stack .fog-label {
+    font-size: 13px;
+    color: #9ad;
+    font-weight: 700;
+  }
 
   .list-panel {
     width: 220px;
@@ -532,9 +600,23 @@
   .peek-btn.show { display: inline-flex; align-items: center; gap: 6px; }
 
   .next-augment-hint {
-    color: #b9a6ff;
-    font-size: 14px;
-    text-align: center;
+    display: none;
+    gap: 6px;
+    justify-content: center;
+    margin: 4px 0;
+  }
+  .next-augment-hint.show { display: flex; }
+  .next-augment-hint .mini-card {
+    width: 20px;
+    height: 28px;
+    border-radius: 5px;
+    background: repeating-linear-gradient(45deg, #444 0 6px, #3a3a3a 6px 12px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    flex-shrink: 0;
+  }
+  .next-augment-hint .mini-card:first-child {
+    background: #ffd166;
+    box-shadow: 0 0 10px rgba(255, 209, 102, 0.6);
   }
 
   .card-peek-btn {
@@ -562,7 +644,6 @@
 <body>
 
 <h1>업다운 카드 게임</h1>
-<p class="subtitle">빨강 · 파랑 · 초록 · 노랑 (1~10) — 다음 카드가 더 높을까, 낮을까? 틀리거나 같은 숫자면 실패! 실패 시 러시안 룰렛 (1~2회 안전, 3~4회 1/10, 5회부터 1/6). 카드를 진행하며 증강을 선택하세요.</p>
 
 <div class="layout">
   <div class="game-area">
@@ -586,8 +667,8 @@
     <button id="restartBtn">다시 시작</button>
 
     <p class="deck-count">남은 카드: <span id="deckCount">0</span>장</p>
-    <p class="next-augment-hint" id="nextAugmentHint"></p>
-    <p class="memory-hint" id="memoryHint"></p>
+    <div class="next-augment-hint" id="nextAugmentHint"></div>
+    <div class="memory-hint" id="memoryHint"></div>
     <p class="prophecy-hint" id="prophecyHint"></p>
     <button type="button" class="card-peek-btn" id="cardPeekBtn">🔍 다음 카드 확인</button>
     <p class="card-peek-hint" id="cardPeekHint"></p>
@@ -682,7 +763,7 @@
       name: '완벽한 기억',
       tier: 2,
       good: '모든 카드 수량 표시',
-      bad: '동점 사망 확률 +5%p',
+      bad: '동점 실패 시 총알 한 발 추가 장전 (2/6)',
       apply(state) { state.hasPerfectMemory = true; },
     },
     {
@@ -795,15 +876,12 @@
   const cardPeekBtn = document.getElementById('cardPeekBtn');
   const cardPeekHint = document.getElementById('cardPeekHint');
   let cylinderRotation = 0;
-  let rouletteAttempts = 0;
   let rouletteBusy = false; // true while a real (or fun) spin is in flight
 
-  // 1st-2nd pull: guaranteed survive. 3rd-4th: 1/10 odds. 5th+: 1/6 odds.
-  function currentDeathProbability() {
-    if (rouletteAttempts <= 2) return 0;
-    if (rouletteAttempts <= 4) return 1 / 10;
-    return 1 / 6;
-  }
+  // Honest odds: a real 6-chamber cylinder with 1 bullet loaded, always.
+  // No hidden per-attempt scaling — what you see on the cylinder is what
+  // determines the outcome.
+  const BASE_DEATH_PROBABILITY = 1 / 6;
 
   function buildDeck() {
     const d = [];
@@ -871,26 +949,47 @@
   // ---------------------------------------------------------------------
   // Memory / prophecy augment displays
   // ---------------------------------------------------------------------
+  // Perfect memory: exact per-number counts, shown as a card for each
+  // number 1-10 with a count badge (empty numbers dim out).
+  // Imperfect memory: no numbers at all — just two stacked bars whose
+  // relative height shows whether more high or low cards remain.
   function renderMemoryHint() {
+    memoryHintEl.innerHTML = '';
+    memoryHintEl.classList.remove('show-cards', 'show-fog');
+
     if (augmentState.hasPerfectMemory) {
       const counts = {};
       for (let n = 1; n <= 10; n++) counts[n] = 0;
       deck.forEach((c) => counts[c.number]++);
-      const parts = [];
-      for (let n = 1; n <= 10; n++) if (counts[n] > 0) parts.push(`${n}:${counts[n]}`);
-      memoryHintEl.textContent = `🧠 남은 카드 — ${parts.join('  ')}`;
-      memoryHintEl.style.display = 'block';
+      for (let n = 1; n <= 10; n++) {
+        const card = document.createElement('div');
+        card.className = 'memory-card' + (counts[n] === 0 ? ' empty' : '');
+        card.textContent = n;
+        if (counts[n] > 0) {
+          const badge = document.createElement('span');
+          badge.className = 'count-badge';
+          badge.textContent = counts[n];
+          card.appendChild(badge);
+        }
+        memoryHintEl.appendChild(card);
+      }
+      memoryHintEl.classList.add('show-cards');
     } else if (augmentState.hasImperfectMemory) {
       const higher = deck.filter((c) => c.number > currentCard.number).length;
       const lower = deck.filter((c) => c.number < currentCard.number).length;
-      let cmp;
-      if (higher > lower) cmp = '높은 카드가 더 많이 남음 📈';
-      else if (lower > higher) cmp = '낮은 카드가 더 많이 남음 📉';
-      else cmp = '높은 카드와 낮은 카드 수가 같음 ⚖️';
-      memoryHintEl.textContent = `🌫️ ${cmp}`;
-      memoryHintEl.style.display = 'block';
-    } else {
-      memoryHintEl.style.display = 'none';
+      const higherHeight = Math.min(90, 18 + higher * 4);
+      const lowerHeight = Math.min(90, 18 + lower * 4);
+      memoryHintEl.innerHTML = `
+        <div class="fog-stack ${higher >= lower ? 'bigger' : ''}">
+          <div class="fog-bar" style="height:${higherHeight}px"></div>
+          <div class="fog-label">▲ 高</div>
+        </div>
+        <div class="fog-stack ${lower > higher ? 'bigger' : ''}">
+          <div class="fog-bar" style="height:${lowerHeight}px"></div>
+          <div class="fog-label">▼ 低</div>
+        </div>
+      `;
+      memoryHintEl.classList.add('show-fog');
     }
   }
 
@@ -924,17 +1023,24 @@
     cardPeekHint.style.display = 'block';
   });
 
+  // Cards-until-next-augment, shown as a row of face-down mini cards (one
+  // per remaining card) instead of a "N장 남음" sentence.
   function renderNextAugmentHint() {
+    nextAugmentHintEl.innerHTML = '';
     const next = AUGMENT_THRESHOLDS.find(
       (t) => t > augmentState.cardsAdvanced && !augmentState.triggeredThresholds.has(t)
     );
     if (next === undefined) {
-      nextAugmentHintEl.style.display = 'none';
+      nextAugmentHintEl.classList.remove('show');
       return;
     }
     const remaining = next - augmentState.cardsAdvanced;
-    nextAugmentHintEl.textContent = `🎯 다음 증강까지 ${remaining}장`;
-    nextAugmentHintEl.style.display = 'block';
+    for (let i = 0; i < remaining; i++) {
+      const mini = document.createElement('div');
+      mini.className = 'mini-card';
+      nextAugmentHintEl.appendChild(mini);
+    }
+    nextAugmentHintEl.classList.add('show');
   }
 
   function renderOwnedAugments() {
@@ -1081,22 +1187,21 @@
 
   // Runs one trigger-pull: spin the cylinder, then resolve death odds
   // (forced outcome first, then probability overrides, then the base
-  // tiered odds from currentDeathProbability). Resolves to true if died.
+  // honest 1/6). Resolves to true if died.
   // `forced` is resolved once per FAILURE EVENT by the caller (not once per
   // pull) so that augments like blurry-prophecy (2 pulls per failure) don't
   // burn a forced-survive/forced-death block twice in the same failure.
   async function playRoulette(causedByTie, forced) {
     rouletteBusy = true;
     spinFunBtn.disabled = true;
-    rouletteAttempts++;
     chambersGroup.querySelectorAll('.chamber').forEach((c) => c.classList.remove('bullet', 'empty'));
     rouletteResult.textContent = '';
     rouletteResult.className = 'roulette-result';
     roulettePanel.classList.remove('shake');
 
-    // Resolve the outcome BEFORE spinning, so a 1/3 death chance (from the
-    // survival-instinct/immortal-magazine curses) can be shown as a second
-    // bullet loaded into the cylinder rather than just a bigger number.
+    // Resolve the outcome BEFORE spinning, so a double-bullet chance (from
+    // curses) can be shown as a second bullet loaded into the cylinder
+    // rather than just a bigger invisible number.
     let died;
     let doubleLoaded;
     if (forced) {
@@ -1105,13 +1210,16 @@
     } else {
       let prob = augmentState.permanentProbOverride !== null
         ? augmentState.permanentProbOverride
-        : currentDeathProbability();
+        : BASE_DEATH_PROBABILITY;
       if (augmentState.pendingProbOverride !== null) {
         prob = augmentState.pendingProbOverride;
         augmentState.pendingProbOverride = null;
       }
-      if (augmentState.hasPerfectMemory && causedByTie) prob += 0.05;
-      died = Math.random() < Math.min(1, prob);
+      // Perfect Memory's curse: a tie-caused failure loads a second bullet
+      // into the cylinder (2 of 6 chambers, same as the "double loaded"
+      // forced-block visual) instead of silently inflating the percentage.
+      if (augmentState.hasPerfectMemory && causedByTie) prob = 1 / 3;
+      died = Math.random() < prob;
       doubleLoaded = Math.abs(prob - 1 / 3) < 0.01;
     }
     rouletteSub.textContent = doubleLoaded
@@ -1308,7 +1416,6 @@
     markUsed(currentCard);
     updateStats();
     cylinderRotation = 0;
-    rouletteAttempts = 0;
     chambersGroup.style.transition = 'none';
     chambersGroup.style.transform = 'rotate(0deg)';
     chambersGroup.querySelectorAll('.chamber').forEach((c) => c.classList.remove('bullet', 'empty'));
