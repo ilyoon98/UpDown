@@ -301,25 +301,33 @@
     font-size: 15px;
   }
 
-  /* 증강 카드별 리롤 버튼 */
+  /* 증강 카드별 리롤 버튼 (선택 버튼 아래, 크게) */
   .card-reroll {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: #33334a;
-    color: #ddd;
-    font-size: 16px;
-    padding: 0;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 100%;
+    background: #3a3a52;
+    color: #cfd0e8;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
   }
   .card-reroll:hover:not(:disabled) { background: #47476a; }
-  .reroll-label { color: #aaa; font-size: 14px; font-weight: 700; }
+
+  /* 남은 리롤 표시: 눈에 띄는 배지 */
+  .reroll-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #2a2a3c;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-size: 16px;
+    font-weight: 800;
+    padding: 10px 22px;
+    border-radius: 999px;
+    box-shadow: 0 0 14px rgba(255, 209, 102, 0.25);
+  }
+  .reroll-label.empty { border-color: #555; color: #777; box-shadow: none; }
 
   .message {
     min-height: 32px;
@@ -554,6 +562,19 @@
   }
   .owned-list { display: flex; flex-direction: column; gap: 6px; }
   .owned-empty { color: #666; font-size: 14px; text-align: center; }
+
+  /* 활성 효과 패널: 지금 걸려있는 버프/디버프 목록 */
+  .status-list { display: flex; flex-direction: column; gap: 5px; }
+  .status-item {
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 6px 10px;
+    line-height: 1.4;
+  }
+  .status-item.buff { background: rgba(42, 157, 143, 0.18); color: #7fe3d2; }
+  .status-item.debuff { background: rgba(230, 57, 70, 0.16); color: #ff9d9d; }
+  .status-item.neutral { background: rgba(255, 209, 102, 0.12); color: #ffd166; }
   .owned-chip {
     position: relative;
     border-radius: 8px;
@@ -853,7 +874,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.3.1</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.3.2</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -906,6 +927,11 @@
       </div>
       <div class="roulette-result" id="rouletteResult"></div>
       <button type="button" class="spin-fun-btn" id="spinFunBtn">🎰 재미로 돌려보기</button>
+    </div>
+
+    <div class="owned-panel status-panel">
+      <h2>⚡ 활성 효과</h2>
+      <div class="status-list" id="statusList"></div>
     </div>
 
     <div class="owned-panel">
@@ -1170,7 +1196,7 @@
       good: '다음 죽음 1회 무효',
       bad: '그 후 실패 1회는 총알 +1발',
       apply(s) {
-        s.forcedBlocks.push({ type: 'survive', count: 1, afterEffect: 'oneTimeThird', visual: 'double' });
+        s.forcedBlocks.push({ type: 'survive', count: 1, afterEffect: 'oneTimeThird', visual: 'double', source: '생존 본능' });
       },
     },
     {
@@ -1206,8 +1232,8 @@
       good: '다음 죽음 무효',
       bad: '그다음 실패는 즉사',
       apply(s) {
-        s.forcedBlocks.push({ type: 'survive', count: 1, afterEffect: null });
-        s.forcedBlocks.push({ type: 'death', count: 1, afterEffect: null });
+        s.forcedBlocks.push({ type: 'survive', count: 1, afterEffect: null, source: '검은 계약' });
+        s.forcedBlocks.push({ type: 'death', count: 1, afterEffect: null, source: '검은 계약' });
       },
     },
     {
@@ -1217,7 +1243,7 @@
       good: '다음 5회 무조건 생존',
       bad: '이후 영구 총알 +1발',
       apply(s) {
-        s.forcedBlocks.push({ type: 'survive', count: 5, afterEffect: 'permanentBullet', visual: 'double' });
+        s.forcedBlocks.push({ type: 'survive', count: 5, afterEffect: 'permanentBullet', visual: 'double', source: '불멸의 탄창' });
       },
     },
     {
@@ -1317,6 +1343,7 @@
   const codexBody = document.getElementById('codexBody');
   const codexCloseBtn = document.getElementById('codexCloseBtn');
   const qaPanel = document.getElementById('qaPanel');
+  const statusList = document.getElementById('statusList');
   const peekBtn = document.getElementById('peekBtn');
   const nextAugmentHintEl = document.getElementById('nextAugmentHint');
   const spinFunBtn = document.getElementById('spinFunBtn');
@@ -1550,12 +1577,49 @@
       chip.dataset.tooltip = `축복: ${aug.good}\n저주: ${aug.bad}`;
       ownedList.appendChild(chip);
     });
+    renderActiveEffects(); // 보유 증강이 바뀌면 활성 효과도 같이 갱신
+  }
+
+  // 지금 걸려있는 버프/디버프를 전부 나열 — "왜 살았지/죽었지"가 보이게
+  function renderActiveEffects() {
+    statusList.innerHTML = '';
+    const s = augmentState;
+    const items = [];
+    s.forcedBlocks.forEach((b) => {
+      if (b.type === 'survive') items.push({ cls: 'buff', text: `🛡 ${b.source}: ${b.count}회 무조건 생존` });
+      else items.push({ cls: 'debuff', text: `☠ ${b.source}: 다음 실패는 즉사` });
+    });
+    if (s.shieldCharges > 0) items.push({ cls: 'buff', text: `🛡 강철 심장: 룰렛 면제 ${s.shieldCharges}회` });
+    if (s.comboGuardCharges > 0) items.push({ cls: 'buff', text: `📌 기록 보호: 실패해도 콤보 유지 ${s.comboGuardCharges}회` });
+    if (s.phoenixCharges > 0) items.push({ cls: 'buff', text: `🕊 불사조: 사망 시 50% 부활 (${s.phoenixCharges}회)` });
+    if (s.tieIsWin) items.push({ cls: 'buff', text: '🃏 독심술: 동점도 정답 처리' });
+    if (s.streakBonus > 0) items.push({ cls: 'buff', text: `⚡ 정답당 콤보 +${1 + s.streakBonus} (기본 1+${s.streakBonus})` });
+    if (s.pendingBulletBonus > 0) items.push({ cls: 'debuff', text: `⚠ 다음 실패: 총알 +${s.pendingBulletBonus}발 (1회성)` });
+    if (s.bulletCurses > 0) items.push({ cls: 'debuff', text: `☠ 영구 저주: 실패 시 총알 +${s.bulletCurses}발` });
+    if (s.forcedRouletteEvery) {
+      const left = s.forcedRouletteEvery - (s.correctCount % s.forcedRouletteEvery);
+      items.push({ cls: 'neutral', text: `🎲 광기의 축복: 정답 ${left}회 후 강제 룰렛` });
+    }
+    if (items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'owned-empty';
+      empty.textContent = '없음';
+      statusList.appendChild(empty);
+      return;
+    }
+    items.forEach((it) => {
+      const div = document.createElement('div');
+      div.className = `status-item ${it.cls}`;
+      div.textContent = it.text;
+      statusList.appendChild(div);
+    });
   }
 
   function renderAll() {
     updateStats();
     updateButtons();
     updateRouletteSub();
+    renderActiveEffects();
     renderMemoryHint();
     renderProphecyHint();
     renderNextAugmentHint();
@@ -1691,7 +1755,7 @@
       if (block.afterEffect === 'oneTimeThird') augmentState.pendingBulletBonus += 1;
       if (block.afterEffect === 'permanentBullet') augmentState.bulletCurses += 1;
     }
-    return { died: forcedDied, doubleVisual };
+    return { died: forcedDied, doubleVisual, source: block.source, remaining: block.count };
   }
 
   function shufflePick(arr, count) {
@@ -1751,7 +1815,9 @@
     const landed = chambers[landedIndex];
 
     if (died) {
-      rouletteResult.textContent = '💥 탕! 사망했습니다';
+      rouletteResult.textContent = forced
+        ? `☠ '${forced.source}'의 대가 — 즉사!`
+        : '💥 탕! 사망했습니다';
       rouletteResult.classList.add('death');
       roulettePanel.classList.add('shake');
       const c = fx.centerOf(roulettePanel);
@@ -1761,12 +1827,21 @@
       sfx('death');
     } else {
       landed.classList.add('empty');
-      rouletteResult.textContent = bullets === 0
-        ? '🍀 찰칵! 총알이 없었습니다'
-        : '😮‍💨 찰칵... 생존했습니다';
+      if (forced) {
+        rouletteResult.textContent = forced.remaining > 0
+          ? `✨ '${forced.source}' 효과로 생존! (${forced.remaining}회 남음)`
+          : `✨ '${forced.source}' 효과로 생존!`;
+        const c = fx.centerOf(roulettePanel);
+        fx.burst(c.x, c.y, { count: 24, colors: ['#ffd166', '#5fd8c4', '#fff'], spread: 140 });
+        sfx('shield');
+      } else {
+        rouletteResult.textContent = bullets === 0
+          ? '🍀 찰칵! 총알이 없었습니다'
+          : '😮‍💨 찰칵... 생존했습니다';
+        sfx('survive');
+      }
       rouletteResult.classList.add('survive');
       fx.flash('rgba(255,255,255,0.18)', 250);
-      sfx('survive');
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1200));
@@ -1957,7 +2032,6 @@
         card.className = `augment-card tier-${aug.tier}`;
         card.style.animationDelay = `${animDelay}s`;
         card.innerHTML = `
-          <button type="button" class="card-reroll" title="이 카드만 교체">↻</button>
           <div class="augment-icon">${aug.tier}</div>
           <div class="augment-name">${aug.name}</div>
           <div class="augment-tier">${TIER_LABEL[aug.tier]}</div>
@@ -1970,6 +2044,7 @@
             <div class="box-body">${aug.bad}</div>
           </div>
           <button type="button" class="augment-pick">선택</button>
+          <button type="button" class="card-reroll">↻ 이 카드 교체</button>
         `;
         card.querySelector('.augment-pick').addEventListener('click', () => finish(aug, card));
         card.querySelector('.card-reroll').addEventListener('click', () => rerollOne(i));
@@ -1986,11 +2061,12 @@
       }
 
       function updateRerollUI() {
-        rerollLabel.textContent = augmentState.rerollCharges > 0
-          ? `🔄 남은 리롤: ${augmentState.rerollCharges} — 카드의 ↻ 버튼으로 개별 교체`
-          : '🔄 리롤을 모두 사용했습니다';
+        const n = augmentState.rerollCharges;
+        rerollLabel.textContent = n > 0 ? `🔄 남은 리롤 ${n}회` : '🔄 리롤 없음';
+        rerollLabel.classList.toggle('empty', n <= 0);
         augmentCardsEl.querySelectorAll('.card-reroll').forEach((b) => {
-          b.disabled = augmentState.rerollCharges <= 0;
+          b.disabled = n <= 0;
+          b.textContent = n > 0 ? `↻ 이 카드 교체 (${n}회 남음)` : '↻ 리롤 없음';
         });
       }
 
