@@ -573,12 +573,13 @@
   .message.tie { color: #d4a017; }
 
   .deck-count { color: #888; font-size: 16px; margin-bottom: 4px; }
+  /* 덱 진행 바: 채워질수록 진행. 눈금 = 증강 등장 지점 */
   .deck-progress {
+    position: relative;
     width: 260px;
-    height: 8px;
+    height: 10px;
     background: #33334a;
     border-radius: 999px;
-    overflow: hidden;
     margin-bottom: 8px;
   }
   .deck-progress-fill {
@@ -587,6 +588,20 @@
     border-radius: 999px;
     transition: width 0.35s ease;
   }
+  .deck-marker {
+    position: absolute;
+    top: -3px;
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    background: #666;
+    transform: translateX(-50%);
+  }
+  .deck-marker.next {
+    background: var(--gold);
+    box-shadow: 0 0 8px rgba(255, 209, 102, 0.9);
+  }
+  .deck-marker.passed { background: #3a3a52; }
 
   .prophecy-hint {
     font-size: 15px;
@@ -1202,26 +1217,6 @@
   }
   .peek-btn.show { display: inline-flex; align-items: center; gap: 6px; }
 
-  .next-augment-hint {
-    display: none;
-    gap: 6px;
-    justify-content: center;
-    margin: 4px 0;
-  }
-  .next-augment-hint.show { display: flex; }
-  .next-augment-hint .mini-card {
-    width: 20px;
-    height: 28px;
-    border-radius: 5px;
-    background: repeating-linear-gradient(45deg, #444 0 6px, #3a3a3a 6px 12px);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    flex-shrink: 0;
-  }
-  .next-augment-hint .mini-card:first-child {
-    background: var(--gold);
-    box-shadow: 0 0 10px rgba(255, 209, 102, 0.6);
-  }
-
   /* 카드 투시: 카드 바로 아래, 파란 글로우 버튼으로 강조 */
   .card-peek-btn {
     display: none;
@@ -1293,7 +1288,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.10</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.11</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
@@ -1330,9 +1325,8 @@
     </div>
     <div class="resource-bar" id="resourceBar"></div>
 
-    <p class="deck-count">남은 카드: <span id="deckCount">0</span>장</p>
-    <div class="deck-progress"><div class="deck-progress-fill" id="deckProgressFill"></div></div>
-    <div class="next-augment-hint" id="nextAugmentHint"></div>
+    <p class="deck-count">남은 카드: <span id="deckCount">0</span>장<span id="nextAugText"></span></p>
+    <div class="deck-progress" id="deckProgress"><div class="deck-progress-fill" id="deckProgressFill"></div></div>
     <div class="memory-hint" id="memoryHint"></div>
     <p class="prophecy-hint" id="prophecyHint"></p>
   </div>
@@ -1955,7 +1949,8 @@
   const resultCloseBtn = document.getElementById('resultCloseBtn');
   let runBest = 0; // 이번 판 최고 콤보
   const peekBtn = document.getElementById('peekBtn');
-  const nextAugmentHintEl = document.getElementById('nextAugmentHint');
+  const deckProgressEl = document.getElementById('deckProgress');
+  const nextAugText = document.getElementById('nextAugText');
   const spinFunBtn = document.getElementById('spinFunBtn');
   const cardPeekBtn = document.getElementById('cardPeekBtn');
   let cylinderRotation = 0;
@@ -2029,7 +2024,8 @@
     bestEl.textContent = best;
     deckCountEl.textContent = deck.length;
     streakEl.classList.toggle('hot', streak >= 10);
-    deckProgressFill.style.width = (deck.length / 39 * 100) + '%';
+    // 진행 바: 진행할수록 채워짐 (눈금 = 증강 지점과 같은 기준)
+    deckProgressFill.style.width = (augmentState.cardsAdvanced / 39 * 100) + '%';
 
     // 콤보 배지: 쌓일수록 색과 크기가 강해진다
     comboCount.textContent = streak;
@@ -2178,23 +2174,31 @@
     sfx('tie');
   });
 
-  // 다음 증강까지 남은 카드 수를 미니 카드 줄로 표시
+  // 덱 진행 바 위의 증강 등장 지점 눈금 생성 (게임 시작 시 1회)
+  function buildDeckMarkers() {
+    deckProgressEl.querySelectorAll('.deck-marker').forEach((m) => m.remove());
+    AUGMENT_THRESHOLDS.forEach((t) => {
+      const marker = document.createElement('div');
+      marker.className = 'deck-marker';
+      marker.dataset.threshold = t;
+      marker.style.left = (t / 39 * 100) + '%';
+      marker.title = `카드 ${t}장 진행 시 증강 등장`;
+      deckProgressEl.appendChild(marker);
+    });
+  }
+
+  // 눈금 상태 + "다음 증강까지 N장" 라벨 갱신
   function renderNextAugmentHint() {
-    nextAugmentHintEl.innerHTML = '';
+    const advanced = augmentState.cardsAdvanced;
     const next = AUGMENT_THRESHOLDS.find(
-      (t) => t > augmentState.cardsAdvanced && !augmentState.triggeredThresholds.has(t)
+      (t) => t > advanced && !augmentState.triggeredThresholds.has(t)
     );
-    if (next === undefined) {
-      nextAugmentHintEl.classList.remove('show');
-      return;
-    }
-    const remaining = next - augmentState.cardsAdvanced;
-    for (let i = 0; i < remaining; i++) {
-      const mini = document.createElement('div');
-      mini.className = 'mini-card';
-      nextAugmentHintEl.appendChild(mini);
-    }
-    nextAugmentHintEl.classList.add('show');
+    deckProgressEl.querySelectorAll('.deck-marker').forEach((m) => {
+      const t = Number(m.dataset.threshold);
+      m.classList.toggle('passed', t <= advanced || augmentState.triggeredThresholds.has(t));
+      m.classList.toggle('next', t === next);
+    });
+    nextAugText.textContent = next !== undefined ? ` · ✨ 다음 증강까지 ${next - advanced}장` : '';
   }
 
   // 충전형 증강의 남은 횟수 표시용
@@ -2904,6 +2908,7 @@
     renderCard(nextCardEl, null, true);
     setMessage('');
     resetCardGrid();
+    buildDeckMarkers();
     markUsed(currentCard);
     cylinderRotation = 0;
     chambersGroup.style.transition = 'none';
