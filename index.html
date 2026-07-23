@@ -483,17 +483,40 @@
     animation: pulseBtn 1.4s ease infinite;
   }
 
-  /* 증강 카드별 리롤 버튼 (선택 버튼 아래, 크게) */
-  .card-reroll {
-    width: 100%;
-    background: #3a3a52;
-    color: #cfd0e8;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 700;
+  /* 증강 슬롯: 카드 + 카드 밖 아래 리롤 버튼 */
+  .augment-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 300px;
+    min-width: 0;
+    max-width: 340px;
   }
-  .card-reroll:hover:not(:disabled) { background: #47476a; }
+  .augment-slot .augment-card { flex: none; width: 100%; max-width: none; }
+
+  /* 카드 밖 리롤 버튼: 선택 버튼과 확실히 구분되는 스타일 + 글로우 강조 */
+  .card-reroll {
+    background: #1e1e2e;
+    color: var(--gold);
+    border: 2px solid var(--gold);
+    padding: 10px 26px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 800;
+    animation: rerollGlow 1.4s ease infinite;
+  }
+  @keyframes rerollGlow {
+    0%, 100% { box-shadow: 0 0 6px rgba(255, 209, 102, 0.3); }
+    50% { box-shadow: 0 0 18px rgba(255, 209, 102, 0.7); }
+  }
+  .card-reroll:hover:not(:disabled) { background: #33334a; }
+  .card-reroll:disabled {
+    color: #666;
+    border-color: #444;
+    animation: none;
+    box-shadow: none;
+  }
 
   /* 남은 리롤 표시: 눈에 띄는 배지 */
   .reroll-label {
@@ -1145,7 +1168,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.0</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.1</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -2603,18 +2626,29 @@
             <div class="box-label">저주</div>
             <div class="box-body">${aug.bad}</div>
           </div>
-          <button type="button" class="augment-pick">선택</button>
-          <button type="button" class="card-reroll">↻ 이 카드 교체</button>
+          <button type="button" class="augment-pick">✔ 선택</button>
         `;
         card.querySelector('.augment-pick').addEventListener('click', () => finish(aug, card));
-        card.querySelector('.card-reroll').addEventListener('click', () => rerollOne(i));
         return card;
+      }
+
+      // 슬롯 = 카드 + 카드 밖 아래의 리롤 버튼
+      function buildSlot(aug, i, animDelay) {
+        const slot = document.createElement('div');
+        slot.className = 'augment-slot';
+        slot.appendChild(buildCard(aug, i, animDelay));
+        const rerollBtn = document.createElement('button');
+        rerollBtn.type = 'button';
+        rerollBtn.className = 'card-reroll';
+        rerollBtn.addEventListener('click', () => rerollOne(i));
+        slot.appendChild(rerollBtn);
+        return slot;
       }
 
       function renderOptions() {
         augmentCardsEl.innerHTML = '';
         options.forEach((aug, i) => {
-          augmentCardsEl.appendChild(buildCard(aug, i, i * 0.12));
+          augmentCardsEl.appendChild(buildSlot(aug, i, i * 0.12));
         });
         revealEffects(options);
         updateRerollUI();
@@ -2638,7 +2672,8 @@
         augmentState.rerollCharges--;
         options[index] = replacement;
         const newCard = buildCard(replacement, index, 0);
-        augmentCardsEl.replaceChild(newCard, augmentCardsEl.children[index]);
+        const slot = augmentCardsEl.children[index];
+        slot.replaceChild(newCard, slot.querySelector('.augment-card'));
         if (replacement.tier === 3) {
           sfx('legendary');
           fx.flash('rgba(180, 92, 212, 0.3)', 500);
