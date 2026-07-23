@@ -148,6 +148,12 @@
     line-height: 1.3;
     padding: 0 6px;
   }
+  .card .card-effect.num {
+    margin-top: 2px;
+    font-size: 10px;
+    color: #a07d12;
+    opacity: 0.95;
+  }
 
   .card.back {
     background: repeating-linear-gradient(45deg, #444 0 10px, #3a3a3a 10px 20px);
@@ -995,7 +1001,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.6.0</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.7.0</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1659,6 +1665,14 @@
     return arr;
   }
 
+  // 특별 숫자 효과 요약 (카드 위에 표기)
+  function numberEffectText(n) {
+    if (n === 1 || n === 10) return '⭐ 극단 — 게이지 +1';
+    if (n === 5 || n === 6) return '🎲 도박수 +2';
+    if (n === 7) return '🍀 럭키세븐 +3';
+    return '';
+  }
+
   // 색상별 효과 요약 (카드 위에 표기, 증강 보유 시 수치 반영)
   function suitEffectText(suit) {
     const s = augmentState;
@@ -1679,7 +1693,9 @@
       return;
     }
     el.classList.add(card.suit);
-    el.innerHTML = `${card.number}<div class="suit-label">${card.label}</div><div class="card-effect">${suitEffectText(card.suit)}</div>`;
+    const numFx = numberEffectText(card.number);
+    el.innerHTML = `${card.number}<div class="suit-label">${card.label}</div><div class="card-effect">${suitEffectText(card.suit)}</div>`
+      + (numFx ? `<div class="card-effect num">${numFx}</div>` : '');
   }
 
   function setMessage(text, type) {
@@ -1700,6 +1716,31 @@
     comboBadge.classList.toggle('lv2', streak >= 5 && streak < 10);
     comboBadge.classList.toggle('lv3', streak >= 10 && streak < 20);
     comboBadge.classList.toggle('lv4', streak >= 20);
+  }
+
+  // 색 게이지 1칸 충전 (3칸 완성 시 보상 지급). floats 배열에 연출 텍스트 추가.
+  function tickGauge(kind, floats) {
+    const s = augmentState;
+    if (kind === 'blue') {
+      s.blueGauge++;
+      if (s.blueGauge >= 3) {
+        s.blueGauge = 0;
+        s.hasCardPeek = true;
+        s.peekCharges++;
+        floats.push(['🔵 카드 투시 +1회!', '#7bb7ff']);
+      } else {
+        floats.push([`🔵 지혜 ${s.blueGauge}/3`, '#7bb7ff']);
+      }
+    } else {
+      s.greenGauge++;
+      if (s.greenGauge >= 3) {
+        s.greenGauge = 0;
+        s.shieldCharges++;
+        floats.push(['🟢 룰렛 방패 +1회!', '#5fd8c4']);
+      } else {
+        floats.push([`🟢 생명 ${s.greenGauge}/3`, '#5fd8c4']);
+      }
+    }
   }
 
   // 콤보 배지 팝 애니메이션 재생
@@ -2627,24 +2668,23 @@
         gain += r;
         colorFloats.push([`🔴 도박 성공 +${r}`, '#ff7b7b']);
       } else if (col === 'blue') {
-        augmentState.blueGauge++;
-        if (augmentState.blueGauge >= 3) {
-          augmentState.blueGauge = 0;
-          augmentState.hasCardPeek = true;
-          augmentState.peekCharges++;
-          colorFloats.push(['🔵 카드 투시 +1회!', '#7bb7ff']);
-        } else {
-          colorFloats.push([`🔵 지혜 ${augmentState.blueGauge}/3`, '#7bb7ff']);
-        }
+        tickGauge('blue', colorFloats);
       } else if (col === 'green') {
-        augmentState.greenGauge++;
-        if (augmentState.greenGauge >= 3) {
-          augmentState.greenGauge = 0;
-          augmentState.shieldCharges++;
-          colorFloats.push(['🟢 룰렛 방패 +1회!', '#5fd8c4']);
-        } else {
-          colorFloats.push([`🟢 생명 ${augmentState.greenGauge}/3`, '#5fd8c4']);
-        }
+        tickGauge('green', colorFloats);
+      }
+
+      // ---- 특별 숫자 효과 ----
+      const num = next.number;
+      if (num === 5 || num === 6) {
+        gain += 2;
+        colorFloats.push(['🎲 도박수 +2', '#ff9d5c']);
+      } else if (num === 7) {
+        gain += 3;
+        colorFloats.push(['🍀 럭키세븐 +3', '#7fe37f']);
+      } else if (num === 1 || num === 10) {
+        colorFloats.push(['⭐ 극단의 보상 — 게이지 +1', '#ffd166']);
+        tickGauge('blue', colorFloats);
+        tickGauge('green', colorFloats);
       }
 
       // 색채 공명: 같은 색 연속 정답
@@ -2792,6 +2832,22 @@
       ['🟡 노랑', '정답 시 콤보 +1'],
       ['🔵 파랑', '정답 3회 모으면 카드 투시 +1회'],
       ['🟢 초록', '정답 3회 모으면 룰렛 방패 +1회'],
+    ].forEach(([name, desc]) => {
+      const item = document.createElement('div');
+      item.className = 'codex-item';
+      item.innerHTML = `<span class="cx-name">${name}</span><span class="cx-desc">${desc}</span>`;
+      codexBody.appendChild(item);
+    });
+
+    // 특별 숫자 효과 안내
+    const numTitle = document.createElement('div');
+    numTitle.className = 'codex-tier-title t1';
+    numTitle.textContent = '🔢 특별 숫자 효과 (기본 규칙)';
+    codexBody.appendChild(numTitle);
+    [
+      ['⭐ 1 · 10', '정답 시 지혜·생명 게이지 +1씩 (극단의 보상)'],
+      ['🎲 5 · 6', '정답 시 콤보 +2 (맞히기 어려운 중앙값 보상)'],
+      ['🍀 7', '정답 시 콤보 +3 (럭키세븐)'],
     ].forEach(([name, desc]) => {
       const item = document.createElement('div');
       item.className = 'codex-item';
