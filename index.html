@@ -1199,7 +1199,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.4</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.5</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
@@ -1960,6 +1960,12 @@
     comboBadge.classList.remove('pop');
     void comboBadge.offsetWidth;
     comboBadge.classList.add('pop');
+  }
+
+  // 업/다운 버튼 활성화. 1이면 다운, 10이면 업은 이길 수 없으므로 비활성화.
+  function setChoiceButtons(enabled) {
+    upBtn.disabled = !enabled || (currentCard && currentCard.number === 10);
+    downBtn.disabled = !enabled || (currentCard && currentCard.number === 1);
   }
 
   // 확률의 눈: 업/다운 버튼에 성공 확률 % 표시
@@ -2813,8 +2819,7 @@
     buildCylinder(6);
     renderAll();
     restartBtn.classList.remove('attention');
-    upBtn.disabled = false;
-    downBtn.disabled = false;
+    setChoiceButtons(true);
   }
 
   // 결과 화면: 이번 판 요약 (콤보, 진행도, 획득 증강, 사망 원인)
@@ -3064,8 +3069,7 @@
       }
 
       await maybeOfferAugment(prevCardCount, augmentState.cardsAdvanced);
-      upBtn.disabled = false;
-      downBtn.disabled = false;
+      setChoiceButtons(true);
     }, 900);
   }
 
