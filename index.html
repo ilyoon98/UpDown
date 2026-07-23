@@ -138,22 +138,53 @@
     margin-top: 8px;
     font-weight: 700;
   }
-  /* 카드 위에 그 색상의 효과를 직접 표기 */
-  .card .card-effect {
-    font-size: 15px;
-    font-weight: 700;
-    margin-top: 8px;
-    opacity: 0.85;
-    text-align: center;
-    line-height: 1.35;
+  /* 카드 효과 뱃지: 고유명사만 표기, 호버 시 설명 툴팁 */
+  .card-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
     padding: 0 8px;
   }
-  .card .card-effect.num {
-    margin-top: 3px;
+  .card-badge {
+    position: relative;
     font-size: 14px;
-    color: #a07d12;
-    opacity: 0.95;
+    font-weight: 800;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    cursor: default;
+    white-space: nowrap;
   }
+  .card-badge.num {
+    color: #a07d12;
+    background: rgba(212, 160, 23, 0.15);
+  }
+  .card-badge::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 190px;
+    background: #101018;
+    color: #f0f0f0;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: normal;
+    text-align: left;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 4000;
+  }
+  .card-badge:hover::after { opacity: 1; }
 
   .card.back {
     background: repeating-linear-gradient(45deg, #444 0 10px, #3a3a3a 10px 20px);
@@ -1001,7 +1032,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.7.1</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.7.2</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1665,24 +1696,24 @@
     return arr;
   }
 
-  // 특별 숫자 효과 요약 (카드 위에 표기)
-  function numberEffectText(n) {
-    if (n === 1 || n === 10) return '⭐ 극단 — 게이지 +1';
-    if (n === 5 || n === 6) return '🎲 도박수 +2';
-    if (n === 7) return '🍀 럭키세븐 +3';
-    return '';
-  }
-
-  // 색상별 효과 요약 (카드 위에 표기, 증강 보유 시 수치 반영)
-  function suitEffectText(suit) {
+  // 색상 효과 뱃지: 고유명사 + 호버 설명 (증강 보유 시 수치 반영)
+  function suitBadgeInfo(suit) {
     const s = augmentState;
     switch (suit) {
-      case 'red': return `정답 +${s.hasRedContract ? 4 : 2} · 오답 🔫+${s.hasRedContract ? 2 : 1}`;
-      case 'yellow': return `정답 +${s.hasGoldenEye ? 2 : 1}`;
-      case 'blue': return '3장 → 투시 +1';
-      case 'green': return '3장 → 방패 +1';
-      default: return '';
+      case 'red': return { label: '🔥 도박', tip: `정답 시 콤보 +${s.hasRedContract ? 4 : 2}, 오답 시 방아쇠 +${s.hasRedContract ? 2 : 1}회. 하이리스크 하이리턴!` };
+      case 'yellow': return { label: '💰 황금', tip: `정답 시 콤보 +${s.hasGoldenEye ? 2 : 1}. 리스크 없는 안정 보너스.` };
+      case 'blue': return { label: '📘 지혜', tip: '정답 3회 모으면 카드 투시(다음 카드 미리 보기) +1회.' };
+      case 'green': return { label: '🌿 생명', tip: '정답 3회 모으면 룰렛 방패(실패 1회 룰렛 면제) +1회.' };
+      default: return null;
     }
+  }
+
+  // 특별 숫자 효과 뱃지
+  function numberBadgeInfo(n) {
+    if (n === 1 || n === 10) return { label: '⭐ 극단', tip: '정답 시 지혜·생명 게이지가 +1씩 충전됩니다.' };
+    if (n === 5 || n === 6) return { label: '🎲 승부수', tip: '정답 시 콤보 +2. 중앙값은 맞히기 어려운 만큼 보상도 큽니다.' };
+    if (n === 7) return { label: '🍀 럭키세븐', tip: '정답 시 콤보 +3!' };
+    return null;
   }
 
   function renderCard(el, card, faceDown = false) {
@@ -1693,9 +1724,13 @@
       return;
     }
     el.classList.add(card.suit);
-    const numFx = numberEffectText(card.number);
-    el.innerHTML = `${card.number}<div class="suit-label">${card.label}</div><div class="card-effect">${suitEffectText(card.suit)}</div>`
-      + (numFx ? `<div class="card-effect num">${numFx}</div>` : '');
+    const suitB = suitBadgeInfo(card.suit);
+    const numB = numberBadgeInfo(card.number);
+    let badges = `<div class="card-badges">`;
+    if (suitB) badges += `<span class="card-badge" data-tooltip="${suitB.tip}">${suitB.label}</span>`;
+    if (numB) badges += `<span class="card-badge num" data-tooltip="${numB.tip}">${numB.label}</span>`;
+    badges += '</div>';
+    el.innerHTML = `${card.number}<div class="suit-label">${card.label}</div>${badges}`;
   }
 
   function setMessage(text, type) {
@@ -2677,7 +2712,7 @@
       const num = next.number;
       if (num === 5 || num === 6) {
         gain += 2;
-        colorFloats.push(['🎲 도박수 +2', '#ff9d5c']);
+        colorFloats.push(['🎲 승부수 +2', '#ff9d5c']);
       } else if (num === 7) {
         gain += 3;
         colorFloats.push(['🍀 럭키세븐 +3', '#7fe37f']);
@@ -2845,9 +2880,9 @@
     numTitle.textContent = '🔢 특별 숫자 효과 (기본 규칙)';
     codexBody.appendChild(numTitle);
     [
-      ['⭐ 1 · 10', '정답 시 지혜·생명 게이지 +1씩 (극단의 보상)'],
-      ['🎲 5 · 6', '정답 시 콤보 +2 (맞히기 어려운 중앙값 보상)'],
-      ['🍀 7', '정답 시 콤보 +3 (럭키세븐)'],
+      ['⭐ 극단 (1·10)', '정답 시 지혜·생명 게이지 +1씩'],
+      ['🎲 승부수 (5·6)', '정답 시 콤보 +2 (맞히기 어려운 중앙값 보상)'],
+      ['🍀 럭키세븐 (7)', '정답 시 콤보 +3'],
     ].forEach(([name, desc]) => {
       const item = document.createElement('div');
       item.className = 'codex-item';
