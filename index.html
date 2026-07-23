@@ -1115,25 +1115,33 @@
     box-shadow: 0 0 10px rgba(255, 209, 102, 0.6);
   }
 
+  /* 카드 투시: 카드 바로 아래, 파란 글로우 버튼으로 강조 */
   .card-peek-btn {
     display: none;
-    margin-top: 4px;
-    background: #3a3a52;
-    color: #ddd;
-    padding: 8px 18px;
+    margin: -16px 0 14px;
+    background: linear-gradient(135deg, #2364e8, #4a8cff);
+    color: #fff;
+    padding: 12px 30px;
     border-radius: 999px;
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 800;
+    animation: peekGlow 1.4s ease infinite;
   }
-  .card-peek-btn:hover { background: #47476a; }
+  @keyframes peekGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(74, 140, 255, 0.4); }
+    50% { box-shadow: 0 0 22px rgba(74, 140, 255, 0.85); }
+  }
+  .card-peek-btn:hover { filter: brightness(1.15); }
   .card-peek-btn.show { display: inline-block; }
 
   .card-peek-hint {
     display: none;
-    color: #f4c95d;
-    font-size: 15px;
-    font-weight: 700;
+    color: #7bb7ff;
+    font-size: 18px;
+    font-weight: 800;
     text-align: center;
+    margin: -6px 0 12px;
+    text-shadow: 0 0 12px rgba(74, 140, 255, 0.5);
   }
 
   /* ---------------- 이펙트 레이어 ---------------- */
@@ -1168,7 +1176,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.2</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.3</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1183,6 +1191,9 @@
       <div class="arrow">→</div>
       <div id="nextCard" class="card back">?</div>
     </div>
+
+    <button type="button" class="card-peek-btn" id="cardPeekBtn">🔍 다음 카드 확인</button>
+    <p class="card-peek-hint" id="cardPeekHint"></p>
 
     <div class="message" id="message"></div>
 
@@ -1205,8 +1216,6 @@
     <div class="next-augment-hint" id="nextAugmentHint"></div>
     <div class="memory-hint" id="memoryHint"></div>
     <p class="prophecy-hint" id="prophecyHint"></p>
-    <button type="button" class="card-peek-btn" id="cardPeekBtn">🔍 다음 카드 확인</button>
-    <p class="card-peek-hint" id="cardPeekHint"></p>
   </div>
 
   <div class="side-panels">
