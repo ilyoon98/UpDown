@@ -572,7 +572,30 @@
   .message.lose { color: var(--red); }
   .message.tie { color: #d4a017; }
 
-  .deck-count { color: #888; font-size: 16px; margin-bottom: 4px; }
+  /* 남은 카드 / 다음 증강 정보 배지 */
+  .deck-info {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .deck-pill {
+    background: #2a2a3c;
+    border: 1px solid #3a3a52;
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #aab;
+  }
+  .deck-pill b { color: #fff; font-size: 17px; font-weight: 900; }
+  .deck-pill.gold { border-color: rgba(255, 209, 102, 0.5); color: #cfb372; }
+  .deck-pill.gold b { color: var(--gold); }
+  .deck-pill.gold.soon {
+    animation: pulseBtn 1.2s ease infinite;
+    background: rgba(255, 209, 102, 0.12);
+  }
   /* 덱 진행 바: 채워질수록 진행. 눈금 = 증강 등장 지점 */
   .deck-progress {
     position: relative;
@@ -1292,7 +1315,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.13</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.14</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
@@ -1329,7 +1352,10 @@
     </div>
     <div class="resource-bar" id="resourceBar"></div>
 
-    <p class="deck-count">남은 카드: <span id="deckCount">0</span>장<span id="nextAugText"></span></p>
+    <div class="deck-info">
+      <span class="deck-pill">🃏 남은 카드 <b id="deckCount">0</b>장</span>
+      <span class="deck-pill gold" id="nextAugPill">✨ 다음 증강까지 <b id="nextAugCount">-</b>장</span>
+    </div>
     <div class="deck-progress" id="deckProgress"><div class="deck-progress-fill" id="deckProgressFill"></div></div>
     <div class="memory-hint" id="memoryHint"></div>
     <p class="prophecy-hint" id="prophecyHint"></p>
@@ -1954,7 +1980,8 @@
   let runBest = 0; // 이번 판 최고 콤보
   const peekBtn = document.getElementById('peekBtn');
   const deckProgressEl = document.getElementById('deckProgress');
-  const nextAugText = document.getElementById('nextAugText');
+  const nextAugPill = document.getElementById('nextAugPill');
+  const nextAugCount = document.getElementById('nextAugCount');
   const spinFunBtn = document.getElementById('spinFunBtn');
   const cardPeekBtn = document.getElementById('cardPeekBtn');
   let cylinderRotation = 0;
@@ -2202,7 +2229,13 @@
       m.classList.toggle('passed', t <= advanced || augmentState.triggeredThresholds.has(t));
       m.classList.toggle('next', t === next);
     });
-    nextAugText.textContent = next !== undefined ? ` · ✨ 다음 증강까지 ${next - advanced}장` : '';
+    if (next !== undefined) {
+      nextAugPill.style.display = '';
+      nextAugCount.textContent = next - advanced;
+      nextAugPill.classList.toggle('soon', next - advanced <= 1);
+    } else {
+      nextAugPill.style.display = 'none';
+    }
   }
 
   // 충전형 증강의 남은 횟수 표시용
