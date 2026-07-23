@@ -1302,25 +1302,43 @@
     pointer-events: none;
     z-index: 5500;
   }
-  /* 새 버전 알림 토스트 */
+  /* 새 버전 알림 버튼 (우상단 유틸 라인) */
   .update-toast {
     display: none;
-    position: fixed;
-    left: 50%;
-    bottom: 24px;
-    transform: translateX(-50%);
-    z-index: 7000;
     background: linear-gradient(135deg, #d4a017, #ffd166);
     color: #1e1e2e;
-    padding: 14px 28px;
-    border-radius: 999px;
+    padding: 13px 22px;
     font-size: 15px;
     font-weight: 800;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    cursor: pointer;
     animation: pulseBtn 1.4s ease infinite;
   }
-  .update-toast.show { display: block; }
+  .update-toast.show { display: inline-block; }
+
+  #changelogBtn {
+    background: #3a3a52;
+    color: #eee;
+    padding: 13px 26px;
+    font-size: 16px;
+    border: 1px solid #55557a;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+  #changelogBtn:hover { background: #47476a; }
+
+  /* 버전 로그 */
+  .cl-version {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--gold);
+    margin: 14px 0 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #3a3a52;
+  }
+  .cl-note {
+    font-size: 13px;
+    color: #c8c8d4;
+    line-height: 1.6;
+    padding-left: 4px;
+  }
 
   .fx-float {
     position: fixed;
@@ -1335,11 +1353,13 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.15</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.16</span></h1>
 
 <div class="top-utils">
+  <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
+  <button type="button" id="changelogBtn">📜 버전 로그</button>
 </div>
 
 <div class="layout">
@@ -1429,7 +1449,14 @@
 </div>
 
 <button type="button" class="peek-btn" id="peekBtn">👁 화면 잠깐 보기</button>
-<button type="button" class="update-toast" id="updateToast">🔄 새 버전이 나왔어요! 눌러서 업데이트</button>
+
+<div class="codex-overlay" id="changelogOverlay">
+  <div class="codex-modal">
+    <h2>📜 버전 로그</h2>
+    <div id="changelogBody"></div>
+    <button type="button" class="codex-close" id="changelogCloseBtn">닫기</button>
+  </div>
+</div>
 
 <div class="codex-overlay" id="codexOverlay">
   <div class="codex-modal">
@@ -3456,6 +3483,7 @@
       codexOverlay.classList.remove('show');
       resultOverlay.classList.remove('show');
       shopOverlay.classList.remove('show');
+      document.getElementById('changelogOverlay').classList.remove('show');
       return;
     }
     if (e.key === 'q' || e.key === 'Q' || e.key === 'ㅂ') {
@@ -3473,6 +3501,38 @@
   });
 
   // ---------------------------------------------------------------------
+  // 버전 로그 (최신이 위)
+  // ---------------------------------------------------------------------
+  const CHANGELOG = [
+    { v: 'v0.9.16', notes: '우상단에 버전 로그 추가 · 업데이트 알림을 우상단으로 이동' },
+    { v: 'v0.9.15', notes: '새 버전 자동 감지 — 배포되면 알림 버튼이 뜨고 눌러서 바로 업데이트' },
+    { v: 'v0.9.11~14', notes: '진행 바에 증강 등장 눈금 · 남은 카드/다음 증강 배지 · 진행 바 확대 · 모바일 표시 개선' },
+    { v: 'v0.9.9~10', notes: '모바일 전면 대응 — 증강/상점/도감/결과/시작 화면 축소, 오버레이 스크롤' },
+    { v: 'v0.9.5~8', notes: '1은 다운·10은 업 비활성화 (입력 버그 핫픽스 포함) · 투시 시 카드 실제 공개 · 상점 버튼 대형화' },
+    { v: 'v0.9.0~4', notes: '🛒 상점 시스템 — 색 카드 정답으로 자원을 모아 아이템 구매 · 리롤 버튼 분리 · 죽을 뻔한 순간 통계' },
+    { v: 'v0.8.x', notes: '콤보 마일스톤(15/30/50 → 생존 보상) · 클리어 별 등급 · 증강 세트 색 시각화' },
+    { v: 'v0.7.x', notes: '특별 숫자 효과 (극단/승부수/럭키세븐) · 카드 확대 · 효과를 뱃지 + 툴팁으로' },
+    { v: 'v0.6.0', notes: '증강 색상 세트 — 같은 색 2개 수집 시 발동 (혈맹/지혜/생명/황금)' },
+    { v: 'v0.5.x', notes: '카드 색상 시스템 · 색상 시너지 증강 · 강제 생존 연출 개선' },
+    { v: 'v0.4.x', notes: '게임오버/클리어 결과 화면 · 시작 화면 · 룰렛 6챔버 고정(자비 곡선은 비공개)' },
+    { v: 'v0.3.x', notes: '근접 보너스 · 카드별 리롤 · 룰렛 물리 판정 · 콤보 UI · 증강 도감 · 활성 효과 패널' },
+    { v: 'v0.2', notes: '동점 무효 규칙 · 증강 16종 확장 · 파티클/효과음 · 키보드 조작' },
+  ];
+
+  const changelogOverlay = document.getElementById('changelogOverlay');
+  const changelogBody = document.getElementById('changelogBody');
+  document.getElementById('changelogBtn').addEventListener('click', () => {
+    changelogBody.innerHTML = CHANGELOG
+      .map((c) => `<div class="cl-version">${c.v}</div><div class="cl-note">${c.notes}</div>`)
+      .join('');
+    changelogOverlay.classList.add('show');
+  });
+  document.getElementById('changelogCloseBtn').addEventListener('click', () => changelogOverlay.classList.remove('show'));
+  changelogOverlay.addEventListener('click', (e) => {
+    if (e.target === changelogOverlay) changelogOverlay.classList.remove('show');
+  });
+
+  // ---------------------------------------------------------------------
   // 새 버전 감지: 5분마다(그리고 탭에 돌아올 때) 서버의 버전을 확인해서
   // 다르면 업데이트 토스트를 띄운다. 누르면 새로고침.
   // ---------------------------------------------------------------------
@@ -3485,7 +3545,7 @@
       const text = await res.text();
       const m = text.match(/id="versionTag">(v[\d.]+)</);
       if (m && m[1] !== CURRENT_VERSION) {
-        updateToast.textContent = `🔄 새 버전 ${m[1]} 업데이트! 눌러서 새로고침`;
+        updateToast.textContent = `🔄 ${m[1]} 업데이트!`;
         updateToast.classList.add('show');
       }
     } catch (e) { /* 오프라인/로컬 파일이면 조용히 무시 */ }
