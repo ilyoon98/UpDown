@@ -647,6 +647,33 @@
   .status-item.buff { background: rgba(42, 157, 143, 0.18); color: #7fe3d2; }
   .status-item.debuff { background: rgba(230, 57, 70, 0.16); color: #ff9d9d; }
   .status-item.neutral { background: rgba(255, 209, 102, 0.12); color: #ffd166; }
+
+  /* 활성 효과 마우스 오버 설명 툴팁 */
+  .status-item { position: relative; cursor: default; }
+  .status-item::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 240px;
+    background: #101018;
+    color: #f0f0f0;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: pre-line;
+    text-align: left;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 4000;
+  }
+  .status-item:hover::after { opacity: 1; }
   .owned-chip {
     position: relative;
     border-radius: 8px;
@@ -946,7 +973,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.5.0</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.5.1</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1753,28 +1780,28 @@
     const s = augmentState;
     const items = [];
     s.forcedBlocks.forEach((b) => {
-      if (b.type === 'survive') items.push({ cls: 'buff', text: `🛡 ${b.source}: ${b.count}회 무조건 생존` });
-      else items.push({ cls: 'debuff', text: `☠ ${b.source}: 다음 실패는 즉사` });
+      if (b.type === 'survive') items.push({ cls: 'buff', text: `🛡 ${b.source}: ${b.count}회 무조건 생존`, tip: `'${b.source}' 증강의 효과로 다음 ${b.count}번의 실패에서는 룰렛 결과와 무관하게 무조건 생존합니다.` });
+      else items.push({ cls: 'debuff', text: `☠ ${b.source}: 다음 실패는 즉사`, tip: `'${b.source}'의 저주 — 다음 실패에서는 룰렛과 무관하게 즉시 사망합니다.` });
     });
-    if (s.shieldCharges > 0) items.push({ cls: 'buff', text: `🛡 강철 심장: 룰렛 면제 ${s.shieldCharges}회` });
-    if (s.comboGuardCharges > 0) items.push({ cls: 'buff', text: `📌 기록 보호: 실패해도 콤보 유지 ${s.comboGuardCharges}회` });
-    if (s.phoenixCharges > 0) items.push({ cls: 'buff', text: `🕊 불사조: 사망 시 50% 부활 (${s.phoenixCharges}회)` });
-    if (s.tieIsWin) items.push({ cls: 'buff', text: '🃏 독심술: 동점도 정답 처리' });
-    if (s.streakBonus > 0) items.push({ cls: 'buff', text: `⚡ 정답당 콤보 +${1 + s.streakBonus} (기본 1+${s.streakBonus})` });
-    if (s.pendingBulletBonus > 0) items.push({ cls: 'debuff', text: `⚠ 다음 실패: 총알 +${s.pendingBulletBonus}발 (1회성)` });
-    if (s.bulletCurses > 0) items.push({ cls: 'debuff', text: `☠ 영구 저주: 실패 시 총알 +${s.bulletCurses}발` });
+    if (s.shieldCharges > 0) items.push({ cls: 'buff', text: `🛡 룰렛 방패: ${s.shieldCharges}회`, tip: '실패해도 룰렛 자체를 돌리지 않고 안전하게 넘어갑니다. 초록 카드 게이지나 강철 심장 증강으로 충전됩니다.' });
+    if (s.comboGuardCharges > 0) items.push({ cls: 'buff', text: `📌 기록 보호: ${s.comboGuardCharges}회`, tip: '실패해도 연속 성공(콤보) 기록이 초기화되지 않습니다.' });
+    if (s.phoenixCharges > 0) items.push({ cls: 'buff', text: `🕊 불사조: 사망 시 50% 부활 (${s.phoenixCharges}회)`, tip: '사망이 확정되는 순간 50% 확률로 부활합니다. 부활에 성공하면 그 대가로 영구 총알이 +1발 늘어납니다.' });
+    if (s.tieIsWin) items.push({ cls: 'buff', text: '🃏 독심술: 동점도 정답 처리', tip: '같은 숫자가 나와도 무승부가 아니라 정답으로 처리됩니다.' });
+    if (s.streakBonus > 0) items.push({ cls: 'buff', text: `⚡ 정답당 콤보 +${1 + s.streakBonus} (기본 1+${s.streakBonus})`, tip: '증강 효과로 정답 1회마다 콤보를 추가로 얻습니다. 근접/색상 보너스는 여기에 또 더해집니다.' });
+    if (s.pendingBulletBonus > 0) items.push({ cls: 'debuff', text: `⚠ 다음 실패: 총알 +${s.pendingBulletBonus}발 (1회성)`, tip: '다음 실패 1회에만 룰렛에 총알이 추가로 장전됩니다. 한 번 발동하면 사라집니다.' });
+    if (s.bulletCurses > 0) items.push({ cls: 'debuff', text: `☠ 영구 저주: 실패 시 총알 +${s.bulletCurses}발`, tip: '증강의 저주가 쌓여, 실패할 때마다 룰렛에 총알이 기본 1발 + 저주만큼 장전됩니다. 이번 판 내내 유지됩니다.' });
     if (s.forcedRouletteEvery) {
       const left = s.forcedRouletteEvery - (s.correctCount % s.forcedRouletteEvery);
-      items.push({ cls: 'neutral', text: `🎲 광기의 축복: 정답 ${left}회 후 강제 룰렛` });
+      items.push({ cls: 'neutral', text: `🎲 광기의 축복: 정답 ${left}회 후 강제 룰렛`, tip: `정답을 ${s.forcedRouletteEvery}회 맞힐 때마다 실패하지 않아도 강제로 룰렛을 돌립니다. 콤보는 유지됩니다.` });
     }
     // 색상 게이지 (항상 표시 — 색상 시스템 학습용)
-    items.push({ cls: 'neutral', text: `🔵 지혜 게이지 ${s.blueGauge}/3 → 투시 +1` });
-    items.push({ cls: 'neutral', text: `🟢 생명 게이지 ${s.greenGauge}/3 → 방패 +1` });
+    items.push({ cls: 'neutral', text: `🔵 지혜 게이지 ${s.blueGauge}/3 → 투시 +1`, tip: '파랑 카드를 정답으로 3회 맞히면 카드 투시(다음 카드 미리 보기) 1회를 얻습니다.' });
+    items.push({ cls: 'neutral', text: `🟢 생명 게이지 ${s.greenGauge}/3 → 방패 +1`, tip: '초록 카드를 정답으로 3회 맞히면 룰렛 방패(실패 1회 룰렛 면제) 1회를 얻습니다.' });
     if (s.hasResonance && s.sameColorRun >= 2) {
-      items.push({ cls: 'buff', text: `🌀 색채 공명: ${s.sameColorRun}연속 진행 중` });
+      items.push({ cls: 'buff', text: `🌀 색채 공명: ${s.sameColorRun}연속 진행 중`, tip: '같은 색을 연속으로 맞히는 중입니다. 연속이 길수록 추가 콤보가 커지고(2연속 +1, 3연속 +2...), 다른 색이 나오거나 실패하면 초기화됩니다.' });
     }
     if (s.hasRainbow) {
-      items.push({ cls: 'neutral', text: `🌈 무지개 수집: ${s.rainbowSet.size}/4` });
+      items.push({ cls: 'neutral', text: `🌈 무지개 수집: ${s.rainbowSet.size}/4`, tip: '4가지 색을 모두 정답으로 모으면 콤보 +10과 리롤 +1을 얻고 수집이 처음부터 다시 시작됩니다.' });
     }
     if (items.length === 0) {
       const empty = document.createElement('div');
@@ -1787,6 +1814,7 @@
       const div = document.createElement('div');
       div.className = `status-item ${it.cls}`;
       div.textContent = it.text;
+      if (it.tip) div.dataset.tooltip = it.tip;
       statusList.appendChild(div);
     });
   }
