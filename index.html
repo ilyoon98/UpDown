@@ -347,6 +347,32 @@
     font-size: 14px;
   }
 
+  /* ---------------- 시작 화면 ---------------- */
+  .start-modal { max-width: 460px; text-align: center; }
+  .start-modal h2 { font-size: 30px; margin: 4px 0 4px; }
+  .start-sub { color: #aaa; font-size: 14px; margin: 0 0 20px; }
+  .start-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+  .start-step {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #3a3a52;
+    border-radius: 12px;
+    padding: 12px 14px;
+    text-align: left;
+  }
+  .start-step .st-icon { font-size: 26px; flex-shrink: 0; }
+  .start-step .st-title { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
+  .start-step .st-desc { font-size: 13px; color: #aab; line-height: 1.4; }
+  .start-btn {
+    background: var(--gold);
+    color: #1e1e2e;
+    padding: 14px 48px;
+    font-size: 19px;
+    animation: pulseBtn 1.4s ease infinite;
+  }
+
   /* 증강 카드별 리롤 버튼 (선택 버튼 아래, 크게) */
   .card-reroll {
     width: 100%;
@@ -920,7 +946,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.4.0</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.4.1</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1027,6 +1053,37 @@
       <button type="button" class="result-restart" id="resultRestartBtn">🔄 다시 도전</button>
       <button type="button" class="result-close" id="resultCloseBtn">닫고 구경하기</button>
     </div>
+  </div>
+</div>
+
+<div class="codex-overlay show" id="startOverlay">
+  <div class="codex-modal start-modal">
+    <h2>🃏 업다운 카드 게임</h2>
+    <p class="start-sub">운과 배짱의 러시안 룰렛 카드 게임</p>
+    <div class="start-steps">
+      <div class="start-step">
+        <div class="st-icon">🔼</div>
+        <div>
+          <div class="st-title">다음 카드가 높을지 낮을지 맞히세요</div>
+          <div class="st-desc">1~10 카드 40장. 정답마다 콤보가 쌓이고, 차이가 1~2로 아슬아슬하면 보너스!</div>
+        </div>
+      </div>
+      <div class="start-step">
+        <div class="st-icon">🔫</div>
+        <div>
+          <div class="st-title">틀리면 러시안 룰렛</div>
+          <div class="st-desc">처음 2번은 총알이 없어 안전. 실패가 쌓일수록 위험해집니다.</div>
+        </div>
+      </div>
+      <div class="start-step">
+        <div class="st-icon">✨</div>
+        <div>
+          <div class="st-title">증강을 모아 강해지세요</div>
+          <div class="st-desc">카드를 진행하면 증강 선택이 등장. 강한 힘에는 저주가 따릅니다.</div>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="start-btn" id="startGameBtn">게임 시작</button>
   </div>
 </div>
 
@@ -1326,17 +1383,15 @@
 
   // 증강 등장 시점(진행한 카드 수)과, 각 시점의 3장 구성에 쓰는
   // 티어 가중치(1/2/3단계). 인덱스가 서로 대응된다.
-  const AUGMENT_THRESHOLDS = [0, 1, 3, 6, 10, 15, 20, 25, 30, 35];
+  const AUGMENT_THRESHOLDS = [3, 6, 10, 15, 20, 25, 30, 35];
   const TIER_WEIGHTS_BY_STAGE = [
     [80, 20, 0],
-    [70, 25, 5],
-    [60, 30, 10],
+    [65, 30, 5],
     [50, 35, 15],
     [40, 35, 25],
     [30, 35, 35],
     [20, 40, 40],
-    [15, 35, 50],
-    [10, 30, 60],
+    [10, 35, 55],
     [5, 25, 70],
   ];
 
@@ -2244,16 +2299,9 @@
     roulettePanel.classList.remove('shake');
     buildCylinder(6);
     renderAll();
-    upBtn.disabled = true;
-    downBtn.disabled = true;
     restartBtn.classList.remove('attention');
-
-    await maybeOfferAugment(-1, 0); // "0장" 임계값
-
-    if (deck.length > 0) {
-      upBtn.disabled = false;
-      downBtn.disabled = false;
-    }
+    upBtn.disabled = false;
+    downBtn.disabled = false;
   }
 
   // 결과 화면: 이번 판 요약 (콤보, 진행도, 획득 증강, 사망 원인)
@@ -2468,7 +2516,16 @@
   });
 
   // 키보드 조작: ↑ 업 / ↓ 다운 / Q: QA용 전체 카드 패널 / ESC: 도감 닫기
+  // 시작 화면
+  const startOverlay = document.getElementById('startOverlay');
+  document.getElementById('startGameBtn').addEventListener('click', () => {
+    startOverlay.classList.remove('show');
+    sfx('pick');
+    fx.confetti(30);
+  });
+
   document.addEventListener('keydown', (e) => {
+    if (startOverlay.classList.contains('show')) return;
     if (e.key === 'Escape') {
       codexOverlay.classList.remove('show');
       resultOverlay.classList.remove('show');
