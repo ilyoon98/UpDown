@@ -861,12 +861,39 @@
   .augment-name { font-size: 21px; font-weight: 800; color: #f5f5f5; }
 
   .augment-color-tag {
+    position: relative;
     font-size: 12px;
     font-weight: 800;
     padding: 3px 10px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.06);
+    cursor: default;
   }
+  /* 세트 뱃지 호버 시 세트 효과 툴팁 */
+  .augment-color-tag::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 220px;
+    background: #101018;
+    color: #f0f0f0;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: normal;
+    text-align: left;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 4000;
+  }
+  .augment-color-tag:hover::after { opacity: 1; }
   .augment-color-tag.ct-red    { color: #ff9d9d; border: 1px solid rgba(230,57,70,0.5); }
   .augment-color-tag.ct-blue   { color: #7bb7ff; border: 1px solid rgba(35,100,232,0.5); }
   .augment-color-tag.ct-green  { color: #5fd8c4; border: 1px solid rgba(42,157,143,0.5); }
@@ -1032,7 +1059,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.8.0</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.8.1</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -2483,7 +2510,13 @@
           <div class="augment-icon">${aug.tier}</div>
           <div class="augment-name">${aug.name}</div>
           <div class="augment-tier">${TIER_LABEL[aug.tier]}</div>
-          <div class="augment-color-tag ct-${aug.color}">${COLOR_SETS[aug.color].icon} ${COLOR_SETS[aug.color].name} 세트 (${ownedColorCount(aug.color)}/${COLOR_SETS[aug.color].need})</div>
+          <div class="augment-color-tag ct-${aug.color}" data-tooltip="${(() => {
+            const set = COLOR_SETS[aug.color];
+            const n = ownedColorCount(aug.color);
+            return augmentState.setActivated[aug.color]
+              ? `${set.name} 세트 발동됨 — ${set.bonusText} (이미 적용)`
+              : `${set.name} 색 증강을 ${set.need}개 모으면 발동: ${set.bonusText} (현재 ${n}/${set.need})`;
+          })()}">${COLOR_SETS[aug.color].icon} ${COLOR_SETS[aug.color].name} 세트 (${ownedColorCount(aug.color)}/${COLOR_SETS[aug.color].need})</div>
           <div class="augment-box blessing">
             <div class="box-label">축복</div>
             <div class="box-body">${aug.good}</div>
