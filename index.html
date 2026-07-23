@@ -301,6 +301,52 @@
     font-size: 15px;
   }
 
+  /* ---------------- 결과 화면 ---------------- */
+  .result-modal { max-width: 480px; text-align: center; }
+  .result-title { font-size: 34px; font-weight: 900; margin: 4px 0 6px; }
+  .result-title.lose { color: var(--red); text-shadow: 0 0 24px rgba(230,57,70,0.5); }
+  .result-title.win { color: var(--gold); text-shadow: 0 0 24px rgba(255,209,102,0.5); }
+  .result-cause { color: #aaa; font-size: 15px; min-height: 20px; margin-bottom: 18px; }
+  .result-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .rs-box {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #3a3a52;
+    border-radius: 10px;
+    padding: 10px 8px;
+  }
+  .rs-box.highlight { border-color: var(--gold); background: rgba(255,209,102,0.08); }
+  .rs-label { font-size: 12px; color: #999; font-weight: 700; margin-bottom: 4px; }
+  .rs-value { font-size: 22px; font-weight: 900; color: #f5f5f5; }
+  .rs-box.highlight .rs-value { color: var(--gold); }
+  .result-augs-title { font-size: 13px; color: #999; font-weight: 800; margin-bottom: 8px; text-align: left; }
+  .result-augs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+    justify-content: flex-start;
+  }
+  .result-augs .owned-chip { font-size: 12px; padding: 5px 9px; }
+  .result-augs .none { color: #666; font-size: 13px; }
+  .result-btn-row { display: flex; gap: 10px; justify-content: center; }
+  .result-restart {
+    background: var(--gold);
+    color: #1e1e2e;
+    padding: 12px 34px;
+    font-size: 17px;
+  }
+  .result-close {
+    background: #3a3a52;
+    color: #ccc;
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+
   /* 증강 카드별 리롤 버튼 (선택 버튼 아래, 크게) */
   .card-reroll {
     width: 100%;
@@ -874,7 +920,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.3.2</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.4.0</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -967,6 +1013,20 @@
     <h2>📖 증강 도감</h2>
     <div id="codexBody"></div>
     <button type="button" class="codex-close" id="codexCloseBtn">닫기</button>
+  </div>
+</div>
+
+<div class="codex-overlay" id="resultOverlay">
+  <div class="codex-modal result-modal">
+    <div class="result-title" id="resultTitle">💀 사망</div>
+    <div class="result-cause" id="resultCause"></div>
+    <div class="result-stats" id="resultStats"></div>
+    <div class="result-augs-title">이번 판 획득 증강</div>
+    <div class="result-augs" id="resultAugs"></div>
+    <div class="result-btn-row">
+      <button type="button" class="result-restart" id="resultRestartBtn">🔄 다시 도전</button>
+      <button type="button" class="result-close" id="resultCloseBtn">닫고 구경하기</button>
+    </div>
   </div>
 </div>
 
@@ -1344,6 +1404,14 @@
   const codexCloseBtn = document.getElementById('codexCloseBtn');
   const qaPanel = document.getElementById('qaPanel');
   const statusList = document.getElementById('statusList');
+  const resultOverlay = document.getElementById('resultOverlay');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultCause = document.getElementById('resultCause');
+  const resultStats = document.getElementById('resultStats');
+  const resultAugs = document.getElementById('resultAugs');
+  const resultRestartBtn = document.getElementById('resultRestartBtn');
+  const resultCloseBtn = document.getElementById('resultCloseBtn');
+  let runBest = 0; // 이번 판 최고 콤보
   const peekBtn = document.getElementById('peekBtn');
   const nextAugmentHintEl = document.getElementById('nextAugmentHint');
   const spinFunBtn = document.getElementById('spinFunBtn');
@@ -1918,7 +1986,7 @@
 
     if (died) {
       setMessage('💥 러시안 룰렛에서 사망했습니다. 게임 오버.', 'lose');
-      endGame(false);
+      endGame(false, rouletteResult.textContent);
       return true;
     }
     setMessage('😮‍💨 찰칵... 살아남았습니다! 계속 진행하세요.', 'tie');
@@ -2158,6 +2226,8 @@
     deck = buildDeck();
     currentCard = deck.pop();
     streak = 0;
+    runBest = 0;
+    resultOverlay.classList.remove('show');
     augmentState = createInitialAugmentState();
     renderCard(currentCardEl, currentCard);
     currentCardEl.style.opacity = '1';
@@ -2186,7 +2256,48 @@
     }
   }
 
-  function endGame(win) {
+  // 결과 화면: 이번 판 요약 (콤보, 진행도, 획득 증강, 사망 원인)
+  function showResultScreen(win, cause) {
+    resultTitle.textContent = win ? '🏆 클리어!' : '💀 사망';
+    resultTitle.className = `result-title ${win ? 'win' : 'lose'}`;
+    resultCause.textContent = cause || (win ? '덱의 카드를 전부 소진했습니다!' : '');
+
+    const s = augmentState;
+    const rouletteSurvived = Math.max(0, s.failEvents - (win ? 0 : 1));
+    const stats = [
+      { label: '이번 판 최고 콤보', value: runBest, highlight: true },
+      { label: '역대 최고 기록', value: best, highlight: runBest >= best && runBest > 0 },
+      { label: '진행한 카드', value: `${s.cardsAdvanced} / 39` },
+      { label: '정답 수', value: s.correctCount },
+      { label: '룰렛 생존', value: `${rouletteSurvived}회` },
+      { label: '획득 증강', value: `${s.owned.length}개` },
+    ];
+    resultStats.innerHTML = '';
+    stats.forEach((st) => {
+      const box = document.createElement('div');
+      box.className = 'rs-box' + (st.highlight ? ' highlight' : '');
+      box.innerHTML = `<div class="rs-label">${st.label}</div><div class="rs-value">${st.value}</div>`;
+      resultStats.appendChild(box);
+    });
+
+    resultAugs.innerHTML = '';
+    if (s.owned.length === 0) {
+      resultAugs.innerHTML = '<span class="none">없음</span>';
+    } else {
+      s.owned.forEach((id) => {
+        const aug = AUGMENTS.find((a) => a.id === id);
+        if (!aug) return;
+        const chip = document.createElement('div');
+        chip.className = `owned-chip tier-${aug.tier}`;
+        chip.textContent = aug.name;
+        resultAugs.appendChild(chip);
+      });
+    }
+
+    resultOverlay.classList.add('show');
+  }
+
+  function endGame(win, cause) {
     upBtn.disabled = true;
     downBtn.disabled = true;
     restartBtn.classList.add('attention');
@@ -2197,7 +2308,15 @@
       setTimeout(() => fx.confetti(70), 600);
       setTimeout(() => fx.confetti(70), 1200);
     }
+    // 사망/승리 연출이 끝난 뒤 결과 화면 표시
+    setTimeout(() => showResultScreen(win, cause), win ? 1600 : 1200);
   }
+
+  resultRestartBtn.addEventListener('click', () => {
+    resultOverlay.classList.remove('show');
+    startGame();
+  });
+  resultCloseBtn.addEventListener('click', () => resultOverlay.classList.remove('show'));
 
   function guess(direction) {
     if (deck.length === 0 || upBtn.disabled) return;
@@ -2231,6 +2350,7 @@
       streak += gain;
       augmentState.correctCount++;
       if (streak > best) best = streak;
+      if (streak > runBest) runBest = streak;
       nextCardEl.classList.add('glow-win');
       if (isTie) {
         setMessage('동점! 독심술로 정답 처리! 🎉', 'win');
@@ -2294,7 +2414,7 @@
         renderOwnedAugments();
         if (died) {
           setMessage('💥 광기의 대가로 사망했습니다. 게임 오버.', 'lose');
-          endGame(false);
+          endGame(false, '🎲 광기의 축복 — 강제 룰렛에서 사망');
           return;
         }
         setMessage('😮‍💨 찰칵... 광기를 견뎌냈습니다!', 'tie');
@@ -2351,6 +2471,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       codexOverlay.classList.remove('show');
+      resultOverlay.classList.remove('show');
       return;
     }
     if (e.key === 'q' || e.key === 'Q' || e.key === 'ㅂ') {
