@@ -860,6 +860,29 @@
 
   .augment-name { font-size: 21px; font-weight: 800; color: #f5f5f5; }
 
+  /* 증강 카드 상단 색 리본 + 배경 틴트: 어떤 세트 색인지 한눈에 보이게 */
+  .augment-card .set-strip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+  }
+  .set-strip.sc-red    { background: linear-gradient(90deg, #e63946, #ff7b7b); }
+  .set-strip.sc-blue   { background: linear-gradient(90deg, #2364e8, #7bb7ff); }
+  .set-strip.sc-green  { background: linear-gradient(90deg, #2a9d8f, #5fd8c4); }
+  .set-strip.sc-yellow { background: linear-gradient(90deg, #d4a017, #ffd166); }
+  .augment-card.set-red    { background: linear-gradient(180deg, rgba(230,57,70,0.13), #24243a 36%); }
+  .augment-card.set-blue   { background: linear-gradient(180deg, rgba(35,100,232,0.13), #24243a 36%); }
+  .augment-card.set-green  { background: linear-gradient(180deg, rgba(42,157,143,0.13), #24243a 36%); }
+  .augment-card.set-yellow { background: linear-gradient(180deg, rgba(212,160,23,0.13), #24243a 36%); }
+
+  /* 보유 증강 칩에도 세트 색 왼쪽 띠 */
+  .owned-chip.sc-red    { border-left: 5px solid #ff7b7b; }
+  .owned-chip.sc-blue   { border-left: 5px solid #7bb7ff; }
+  .owned-chip.sc-green  { border-left: 5px solid #5fd8c4; }
+  .owned-chip.sc-yellow { border-left: 5px solid #ffd166; }
+
   .augment-color-tag {
     position: relative;
     font-size: 12px;
@@ -1059,7 +1082,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.8.1</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.8.2</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1983,7 +2006,7 @@
       const aug = AUGMENTS.find((a) => a.id === id);
       if (!aug) return;
       const chip = document.createElement('div');
-      chip.className = `owned-chip tier-${aug.tier}`;
+      chip.className = `owned-chip tier-${aug.tier} sc-${aug.color}`;
       const charges = chipChargeInfo(aug);
       const icon = COLOR_SETS[aug.color] ? COLOR_SETS[aug.color].icon + ' ' : '';
       chip.textContent = icon + (charges === null ? aug.name : `${aug.name} ×${charges}`);
@@ -2504,9 +2527,10 @@
 
       function buildCard(aug, i, animDelay) {
         const card = document.createElement('div');
-        card.className = `augment-card tier-${aug.tier}`;
+        card.className = `augment-card tier-${aug.tier} set-${aug.color}`;
         card.style.animationDelay = `${animDelay}s`;
         card.innerHTML = `
+          <div class="set-strip sc-${aug.color}"></div>
           <div class="augment-icon">${aug.tier}</div>
           <div class="augment-name">${aug.name}</div>
           <div class="augment-tier">${TIER_LABEL[aug.tier]}</div>
