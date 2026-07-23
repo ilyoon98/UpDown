@@ -1209,7 +1209,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.6</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.7</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
@@ -1971,7 +1971,11 @@
   }
 
   // 업/다운 버튼 활성화. 1이면 다운, 10이면 업은 이길 수 없으므로 비활성화.
+  // inputLocked가 진행 중 여부의 유일한 판단 기준 (버튼 disabled로 판단하면
+  // 10에서 업이 막힐 때 다운 입력까지 같이 막히는 버그가 생긴다)
+  let inputLocked = true;
   function setChoiceButtons(enabled) {
+    inputLocked = !enabled;
     upBtn.disabled = !enabled || (currentCard && currentCard.number === 10);
     downBtn.disabled = !enabled || (currentCard && currentCard.number === 1);
   }
@@ -2877,8 +2881,7 @@
   }
 
   function endGame(win, cause) {
-    upBtn.disabled = true;
-    downBtn.disabled = true;
+    setChoiceButtons(false);
     restartBtn.classList.add('attention');
     if (win) {
       setMessage(`카드를 모두 소진했습니다! 최종 연속 성공: ${streak}`, 'win');
@@ -2898,9 +2901,10 @@
   resultCloseBtn.addEventListener('click', () => resultOverlay.classList.remove('show'));
 
   function guess(direction) {
-    if (deck.length === 0 || upBtn.disabled) return;
-    upBtn.disabled = true;
-    downBtn.disabled = true;
+    if (deck.length === 0 || inputLocked) return;
+    if (direction === 'up' && upBtn.disabled) return;
+    if (direction === 'down' && downBtn.disabled) return;
+    setChoiceButtons(false);
 
     const prevCardCount = augmentState.cardsAdvanced;
     const prevStreak = streak;
