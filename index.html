@@ -946,7 +946,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.4.2</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.5.0</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1065,7 +1065,7 @@
         <div class="st-icon">🔼</div>
         <div>
           <div class="st-title">다음 카드가 높을지 낮을지 맞히세요</div>
-          <div class="st-desc">1~10 카드 40장. 정답마다 콤보가 쌓이고, 차이가 1~2로 아슬아슬하면 보너스!</div>
+          <div class="st-desc">1~10 카드 40장. 아슬아슬하게 맞히면 보너스, 카드 색상마다 고유 효과가 있어요! (📖 도감 참고)</div>
         </div>
       </div>
       <div class="start-step">
@@ -1289,7 +1289,32 @@
       apply(s) { s.comboGuardCharges += 1; },
     },
 
+    {
+      id: 'golden-eye',
+      name: '황금 감식안',
+      tier: 1,
+      good: '노랑 카드 정답 보너스 2배 (+2)',
+      bad: '없음',
+      apply(s) { s.hasGoldenEye = true; },
+    },
+
     // ---- 2단계 도박형 ----
+    {
+      id: 'red-contract',
+      name: '붉은 계약',
+      tier: 2,
+      good: '빨강 카드 정답 시 콤보 +4',
+      bad: '빨강 카드 오답 시 방아쇠 +2회',
+      apply(s) { s.hasRedContract = true; },
+    },
+    {
+      id: 'color-resonance',
+      name: '색채 공명',
+      tier: 2,
+      good: '같은 색 연속 정답마다 추가 콤보 (2연속 +1, 3연속 +2...)',
+      bad: '실패 시 총알 +1발 (영구)',
+      apply(s) { s.hasResonance = true; s.bulletCurses += 1; },
+    },
     {
       id: 'perfect-memory',
       name: '완벽한 기억',
@@ -1342,6 +1367,14 @@
     },
 
     // ---- 3단계 광기형 ----
+    {
+      id: 'rainbow-blessing',
+      name: '무지개 축복',
+      tier: 3,
+      good: '4색 정답 세트를 완성할 때마다 콤보 +10, 리롤 +1',
+      bad: '영구 총알 +1발',
+      apply(s) { s.hasRainbow = true; s.bulletCurses += 1; },
+    },
     {
       id: 'black-contract',
       name: '검은 계약',
@@ -1426,6 +1459,17 @@
       pendingBulletBonus: 0,     // 1회성 추가 총알 (다음 실패 때 소모)
       pendingBonusPicks: 0,      // 악마의 거래: 추가 증강 선택 횟수
       rerollCharges: 2,
+      // ---- 색상 시스템 ----
+      blueGauge: 0,              // 파랑 정답 누적 (3개 → 투시 +1)
+      greenGauge: 0,             // 초록 정답 누적 (3개 → 방패 +1)
+      lastColor: null,           // 직전 정답 카드 색
+      sameColorRun: 0,           // 같은 색 연속 정답 수 (색채 공명용)
+      rainbowSet: new Set(),     // 무지개 축복: 수집한 색
+      pendingExtraPulls: 0,      // 빨강 오답 등으로 이번 실패에 추가되는 방아쇠 수
+      hasGoldenEye: false,
+      hasRedContract: false,
+      hasResonance: false,
+      hasRainbow: false,
     };
   }
   let augmentState = createInitialAugmentState();
@@ -1723,6 +1767,15 @@
       const left = s.forcedRouletteEvery - (s.correctCount % s.forcedRouletteEvery);
       items.push({ cls: 'neutral', text: `🎲 광기의 축복: 정답 ${left}회 후 강제 룰렛` });
     }
+    // 색상 게이지 (항상 표시 — 색상 시스템 학습용)
+    items.push({ cls: 'neutral', text: `🔵 지혜 게이지 ${s.blueGauge}/3 → 투시 +1` });
+    items.push({ cls: 'neutral', text: `🟢 생명 게이지 ${s.greenGauge}/3 → 방패 +1` });
+    if (s.hasResonance && s.sameColorRun >= 2) {
+      items.push({ cls: 'buff', text: `🌀 색채 공명: ${s.sameColorRun}연속 진행 중` });
+    }
+    if (s.hasRainbow) {
+      items.push({ cls: 'neutral', text: `🌈 무지개 수집: ${s.rainbowSet.size}/4` });
+    }
     if (items.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'owned-empty';
@@ -1993,6 +2046,8 @@
     let pulls = 1;
     if (augmentState.hasProphecy) pulls++;
     if (augmentState.hasGamblersBlood) pulls++;
+    pulls += augmentState.pendingExtraPulls; // 빨강 오답 등의 추가 방아쇠
+    augmentState.pendingExtraPulls = 0;
     let died = false;
     for (let i = 0; i < pulls; i++) {
       died = await playRoulette(forced, failNum);
@@ -2382,7 +2437,62 @@
       // 근접 보너스: 차이 1이면 +2, 차이 2면 +1 (아슬아슬할수록 점수 UP)
       const diff = Math.abs(next.number - currentCard.number);
       const closeBonus = isTie ? 0 : diff === 1 ? 2 : diff === 2 ? 1 : 0;
-      const gain = 1 + augmentState.streakBonus + closeBonus;
+      let gain = 1 + augmentState.streakBonus + closeBonus;
+      const colorFloats = []; // [텍스트, 색상]
+
+      // ---- 색상 효과 (뒤집힌 카드의 색 기준) ----
+      const col = next.suit;
+      if (col === 'yellow') {
+        const y = augmentState.hasGoldenEye ? 2 : 1;
+        gain += y;
+        colorFloats.push([`🟡 황금 +${y}`, '#ffd166']);
+      } else if (col === 'red') {
+        const r = augmentState.hasRedContract ? 4 : 2;
+        gain += r;
+        colorFloats.push([`🔴 도박 성공 +${r}`, '#ff7b7b']);
+      } else if (col === 'blue') {
+        augmentState.blueGauge++;
+        if (augmentState.blueGauge >= 3) {
+          augmentState.blueGauge = 0;
+          augmentState.hasCardPeek = true;
+          augmentState.peekCharges++;
+          colorFloats.push(['🔵 카드 투시 +1회!', '#7bb7ff']);
+        } else {
+          colorFloats.push([`🔵 지혜 ${augmentState.blueGauge}/3`, '#7bb7ff']);
+        }
+      } else if (col === 'green') {
+        augmentState.greenGauge++;
+        if (augmentState.greenGauge >= 3) {
+          augmentState.greenGauge = 0;
+          augmentState.shieldCharges++;
+          colorFloats.push(['🟢 룰렛 방패 +1회!', '#5fd8c4']);
+        } else {
+          colorFloats.push([`🟢 생명 ${augmentState.greenGauge}/3`, '#5fd8c4']);
+        }
+      }
+
+      // 색채 공명: 같은 색 연속 정답
+      augmentState.sameColorRun = augmentState.lastColor === col ? augmentState.sameColorRun + 1 : 1;
+      augmentState.lastColor = col;
+      if (augmentState.hasResonance && augmentState.sameColorRun >= 2) {
+        const bonus = augmentState.sameColorRun - 1;
+        gain += bonus;
+        colorFloats.push([`🌀 공명 ${augmentState.sameColorRun}연속 +${bonus}`, '#e0a7f0']);
+      }
+
+      // 무지개 축복: 4색 세트 완성
+      if (augmentState.hasRainbow) {
+        augmentState.rainbowSet.add(col);
+        if (augmentState.rainbowSet.size >= 4) {
+          augmentState.rainbowSet.clear();
+          gain += 10;
+          augmentState.rerollCharges++;
+          colorFloats.push(['🌈 무지개 완성! +10 & 리롤 +1', '#ffd166']);
+          fx.confetti(50);
+          sfx('combo');
+        }
+      }
+
       streak += gain;
       augmentState.correctCount++;
       if (streak > best) best = streak;
@@ -2402,6 +2512,9 @@
         spread: closeBonus > 0 ? 150 : 110,
       });
       fx.float(c.x, c.y - 40, closeBonus > 0 ? `🎯 +${gain}` : `+${gain}`, closeBonus > 0 ? '#ffd166' : '#5fd8c4', closeBonus > 0 ? 30 : 26);
+      colorFloats.forEach((f, i) => {
+        setTimeout(() => fx.float(c.x, c.y - 80 - i * 8, f[0], f[1], 18), 300 + i * 250);
+      });
       popCombo();
       // 5의 배수 콤보 달성 시 축하 연출
       if (Math.floor(streak / 5) > Math.floor(prevStreak / 5)) {
@@ -2417,7 +2530,16 @@
       sfx('tie');
     } else {
       nextCardEl.classList.add('glow-lose');
-      setMessage('틀렸습니다! 방아쇠를 당깁니다...', 'lose');
+      // 색 연속 기록 초기화 + 빨강 카드의 대가
+      augmentState.sameColorRun = 0;
+      augmentState.lastColor = null;
+      if (next.suit === 'red') {
+        const extra = augmentState.hasRedContract ? 2 : 1;
+        augmentState.pendingExtraPulls += extra;
+        setMessage(`틀렸습니다! 🔴 빨강의 대가 — 방아쇠 +${extra}회!`, 'lose');
+      } else {
+        setMessage('틀렸습니다! 방아쇠를 당깁니다...', 'lose');
+      }
       fx.flash('rgba(230, 57, 70, 0.2)', 300);
       fx.shake(false);
       sfx('wrong');
@@ -2476,6 +2598,24 @@
   // ---------------------------------------------------------------------
   function renderCodex() {
     codexBody.innerHTML = '';
+
+    // 카드 색상 기본 효과 안내
+    const colorTitle = document.createElement('div');
+    colorTitle.className = 'codex-tier-title t1';
+    colorTitle.textContent = '🎨 카드 색상 효과 (기본 규칙)';
+    codexBody.appendChild(colorTitle);
+    [
+      ['🔴 빨강', '정답 시 콤보 +2 · 오답 시 방아쇠 +1회 (하이리스크)'],
+      ['🟡 노랑', '정답 시 콤보 +1'],
+      ['🔵 파랑', '정답 3회 모으면 카드 투시 +1회'],
+      ['🟢 초록', '정답 3회 모으면 룰렛 방패 +1회'],
+    ].forEach(([name, desc]) => {
+      const item = document.createElement('div');
+      item.className = 'codex-item';
+      item.innerHTML = `<span class="cx-name">${name}</span><span class="cx-desc">${desc}</span>`;
+      codexBody.appendChild(item);
+    });
+
     [1, 2, 3].forEach((tier) => {
       const title = document.createElement('div');
       title.className = `codex-tier-title t${tier}`;
