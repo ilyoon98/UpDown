@@ -823,6 +823,18 @@
 
   .augment-name { font-size: 21px; font-weight: 800; color: #f5f5f5; }
 
+  .augment-color-tag {
+    font-size: 12px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .augment-color-tag.ct-red    { color: #ff9d9d; border: 1px solid rgba(230,57,70,0.5); }
+  .augment-color-tag.ct-blue   { color: #7bb7ff; border: 1px solid rgba(35,100,232,0.5); }
+  .augment-color-tag.ct-green  { color: #5fd8c4; border: 1px solid rgba(42,157,143,0.5); }
+  .augment-color-tag.ct-yellow { color: #ffd166; border: 1px solid rgba(212,160,23,0.5); }
+
   .augment-tier {
     font-size: 12px;
     font-weight: 800;
@@ -983,7 +995,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.5.3</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.6.0</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1281,6 +1293,7 @@
       id: 'imperfect-memory',
       name: '불완전한 기억',
       tier: 1,
+      color: 'blue',
       good: '남은 카드의 높음/낮음 비율을 게이지로 표시',
       bad: '없음',
       apply(s) { s.hasImperfectMemory = true; },
@@ -1289,6 +1302,7 @@
       id: 'card-peek',
       name: '카드 투시',
       tier: 1,
+      color: 'blue',
       good: '원할 때 다음 카드 확인 (총 3회)',
       bad: '없음',
       apply(s) { s.hasCardPeek = true; s.peekCharges += 3; },
@@ -1297,6 +1311,7 @@
       id: 'strategist',
       name: '전략가',
       tier: 1,
+      color: 'yellow',
       good: '증강 리롤 횟수 +2',
       bad: '없음',
       apply(s) { s.rerollCharges += 2; },
@@ -1305,6 +1320,7 @@
       id: 'iron-heart',
       name: '강철 심장',
       tier: 1,
+      color: 'green',
       good: '실패 1회는 룰렛을 돌리지 않음 (1회용 방패)',
       bad: '없음',
       apply(s) { s.shieldCharges += 1; },
@@ -1313,6 +1329,7 @@
       id: 'odds-eye',
       name: '확률의 눈',
       tier: 1,
+      color: 'blue',
       good: '업/다운 성공 확률을 % 로 표시',
       bad: '없음',
       apply(s) { s.hasOddsEye = true; },
@@ -1321,6 +1338,7 @@
       id: 'combo-guard',
       name: '기록 보호',
       tier: 1,
+      color: 'yellow',
       good: '실패해도 연속 성공 기록 유지 (1회)',
       bad: '없음',
       apply(s) { s.comboGuardCharges += 1; },
@@ -1330,6 +1348,7 @@
       id: 'golden-eye',
       name: '황금 감식안',
       tier: 1,
+      color: 'yellow',
       good: '노랑 카드 정답 보너스 2배 (+2)',
       bad: '없음',
       apply(s) { s.hasGoldenEye = true; },
@@ -1340,6 +1359,7 @@
       id: 'red-contract',
       name: '붉은 계약',
       tier: 2,
+      color: 'red',
       good: '빨강 카드 정답 시 콤보 +4',
       bad: '빨강 카드 오답 시 방아쇠 +2회',
       apply(s) { s.hasRedContract = true; },
@@ -1348,6 +1368,7 @@
       id: 'color-resonance',
       name: '색채 공명',
       tier: 2,
+      color: 'yellow',
       good: '같은 색 연속 정답마다 추가 콤보 (2연속 +1, 3연속 +2...)',
       bad: '실패 시 총알 +1발 (영구)',
       apply(s) { s.hasResonance = true; s.bulletCurses += 1; },
@@ -1356,6 +1377,7 @@
       id: 'perfect-memory',
       name: '완벽한 기억',
       tier: 2,
+      color: 'blue',
       good: '남은 모든 카드의 수량 표시',
       bad: '실패 시 총알이 1발 더 장전됨 (영구)',
       apply(s) { s.hasPerfectMemory = true; s.bulletCurses += 1; },
@@ -1364,6 +1386,7 @@
       id: 'blurry-prophecy',
       name: '흐릿한 예언',
       tier: 2,
+      color: 'blue',
       good: '다음 카드의 그룹(1~5 / 6~10) 표시',
       bad: '실패 시 방아쇠를 2회 당김',
       apply(s) { s.hasProphecy = true; },
@@ -1372,6 +1395,7 @@
       id: 'survival-instinct',
       name: '생존 본능',
       tier: 2,
+      color: 'green',
       good: '다음 죽음 1회 무효',
       bad: '그 후 실패 1회는 총알 +1발',
       apply(s) {
@@ -1382,6 +1406,7 @@
       id: 'gamblers-blood',
       name: '도박사의 피',
       tier: 2,
+      color: 'red',
       good: '정답마다 연속 성공 +2',
       bad: '실패 시 방아쇠를 2회 당김',
       apply(s) { s.streakBonus += 1; s.hasGamblersBlood = true; },
@@ -1390,6 +1415,7 @@
       id: 'mind-reader',
       name: '독심술',
       tier: 2,
+      color: 'blue',
       good: '동점(같은 숫자)도 정답 처리',
       bad: '실패 시 총알이 1발 더 장전됨 (영구)',
       apply(s) { s.tieIsWin = true; s.bulletCurses += 1; },
@@ -1398,6 +1424,7 @@
       id: 'phoenix-feather',
       name: '불사조의 깃털',
       tier: 2,
+      color: 'green',
       good: '사망 시 50% 확률로 부활 (1회)',
       bad: '부활하면 이후 영구 총알 +1발',
       apply(s) { s.phoenixCharges += 1; },
@@ -1408,6 +1435,7 @@
       id: 'rainbow-blessing',
       name: '무지개 축복',
       tier: 3,
+      color: 'yellow',
       good: '4색 정답 세트를 완성할 때마다 콤보 +10, 리롤 +1',
       bad: '영구 총알 +1발',
       apply(s) { s.hasRainbow = true; s.bulletCurses += 1; },
@@ -1416,6 +1444,7 @@
       id: 'black-contract',
       name: '검은 계약',
       tier: 3,
+      color: 'red',
       good: '다음 죽음 무효',
       bad: '그다음 실패는 즉사',
       apply(s) {
@@ -1427,6 +1456,7 @@
       id: 'immortal-magazine',
       name: '불멸의 탄창',
       tier: 3,
+      color: 'green',
       good: '다음 5회 무조건 생존',
       bad: '이후 영구 총알 +1발',
       apply(s) {
@@ -1437,6 +1467,7 @@
       id: 'devils-deal',
       name: '악마의 거래',
       tier: 3,
+      color: 'red',
       good: '지금 즉시 증강 2개 추가 선택',
       bad: '영구 총알 +1발',
       apply(s) { s.pendingBonusPicks += 2; s.bulletCurses += 1; },
@@ -1445,11 +1476,59 @@
       id: 'madmans-luck',
       name: '광기의 축복',
       tier: 3,
+      color: 'red',
       good: '정답마다 연속 성공 +3',
       bad: '정답 7번마다 강제 룰렛 발동',
       apply(s) { s.streakBonus += 2; s.forcedRouletteEvery = 7; },
     },
   ];
+
+  // ---------------------------------------------------------------------
+  // 증강 색상 세트: 같은 색 증강을 2개 모으면 세트 보너스가 발동한다 (1회성)
+  // ---------------------------------------------------------------------
+  const COLOR_SETS = {
+    red: {
+      icon: '🔴', name: '혈맹', need: 2,
+      bonusText: '죽음 1회 완전 면역 (즉사 포함)',
+      grant(s) { s.deathImmunityCharges += 1; },
+    },
+    blue: {
+      icon: '🔵', name: '지혜', need: 2,
+      bonusText: '카드 투시 +2회',
+      grant(s) { s.hasCardPeek = true; s.peekCharges += 2; },
+    },
+    green: {
+      icon: '🟢', name: '생명', need: 2,
+      bonusText: '룰렛 방패 +1회',
+      grant(s) { s.shieldCharges += 1; },
+    },
+    yellow: {
+      icon: '🟡', name: '황금', need: 2,
+      bonusText: '리롤 +2회',
+      grant(s) { s.rerollCharges += 2; },
+    },
+  };
+
+  function ownedColorCount(color) {
+    return augmentState.owned.filter((id) => {
+      const a = AUGMENTS.find((x) => x.id === id);
+      return a && a.color === color;
+    }).length;
+  }
+
+  // 증강 획득 후 호출: 새로 완성된 색 세트가 있으면 발동시킨다
+  function checkColorSets() {
+    Object.entries(COLOR_SETS).forEach(([color, set]) => {
+      if (augmentState.setActivated[color]) return;
+      if (ownedColorCount(color) < set.need) return;
+      augmentState.setActivated[color] = true;
+      set.grant(augmentState);
+      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 140, `${set.icon} ${set.name} 세트 발동! ${set.bonusText}`, '#ffd166', 28);
+      fx.confetti(40);
+      fx.flash('rgba(255, 209, 102, 0.25)', 500);
+      sfx('legendary');
+    });
+  }
 
   // 증강 등장 시점(진행한 카드 수)과, 각 시점의 3장 구성에 쓰는
   // 티어 가중치(1/2/3단계). 인덱스가 서로 대응된다.
@@ -1507,6 +1586,9 @@
       hasRedContract: false,
       hasResonance: false,
       hasRainbow: false,
+      // ---- 증강 색상 세트 ----
+      setActivated: { red: false, blue: false, green: false, yellow: false },
+      deathImmunityCharges: 0,   // 혈맹 세트: 죽음(즉사 포함) 완전 면역
     };
   }
   let augmentState = createInitialAugmentState();
@@ -1788,7 +1870,8 @@
       const chip = document.createElement('div');
       chip.className = `owned-chip tier-${aug.tier}`;
       const charges = chipChargeInfo(aug);
-      chip.textContent = charges === null ? aug.name : `${aug.name} ×${charges}`;
+      const icon = COLOR_SETS[aug.color] ? COLOR_SETS[aug.color].icon + ' ' : '';
+      chip.textContent = icon + (charges === null ? aug.name : `${aug.name} ×${charges}`);
       if (charges === 0) chip.classList.add('depleted');
       chip.dataset.tooltip = `축복: ${aug.good}\n저주: ${aug.bad}`;
       ownedList.appendChild(chip);
@@ -1826,6 +1909,18 @@
     }
     if (s.hasRainbow) {
       items.push({ cls: 'neutral', text: `🌈 무지개 수집: ${s.rainbowSet.size}/4`, tip: '4가지 색을 모두 정답으로 모으면 콤보 +10과 리롤 +1을 얻고 수집이 처음부터 다시 시작됩니다.' });
+    }
+    // 증강 색상 세트 진행도
+    Object.entries(COLOR_SETS).forEach(([color, set]) => {
+      const n = ownedColorCount(color);
+      if (s.setActivated[color]) {
+        items.push({ cls: 'buff', text: `${set.icon} ${set.name} 세트 발동됨`, tip: `세트 보너스가 적용되었습니다: ${set.bonusText}` });
+      } else if (n > 0) {
+        items.push({ cls: 'neutral', text: `${set.icon} ${set.name} 세트 ${n}/${set.need}`, tip: `${set.name} 색 증강을 ${set.need}개 모으면 발동: ${set.bonusText}` });
+      }
+    });
+    if (s.deathImmunityCharges > 0) {
+      items.push({ cls: 'buff', text: `🔴 죽음 면역 ${s.deathImmunityCharges}회 (즉사 포함)`, tip: '혈맹 세트의 가호 — 어떤 죽음이든(검은 계약의 즉사 포함) 1회 완전히 무효화합니다. 불사조보다 나중에, 최후의 보루로 발동합니다.' });
     }
     if (items.length === 0) {
       const empty = document.createElement('div');
@@ -2119,6 +2214,20 @@
       if (died) break;
     }
     died = await tryPhoenix(died);
+
+    // 혈맹 세트: 죽음(즉사 포함) 완전 면역
+    if (died && augmentState.deathImmunityCharges > 0) {
+      augmentState.deathImmunityCharges--;
+      rouletteResult.textContent = '🔴 혈맹의 가호 — 죽음 면역!';
+      rouletteResult.className = 'roulette-result revive';
+      const c = fx.centerOf(roulettePanel);
+      fx.burst(c.x, c.y, { count: 46, colors: ['#e63946', '#ffd166', '#fff'], spread: 200, size: 10 });
+      fx.flash('rgba(230, 57, 70, 0.3)', 600);
+      sfx('revive');
+      await new Promise((r) => setTimeout(r, 1100));
+      died = false;
+      renderOwnedAugments();
+    }
     return died;
   }
 
@@ -2266,6 +2375,7 @@
           <div class="augment-icon">${aug.tier}</div>
           <div class="augment-name">${aug.name}</div>
           <div class="augment-tier">${TIER_LABEL[aug.tier]}</div>
+          <div class="augment-color-tag ct-${aug.color}">${COLOR_SETS[aug.color].icon} ${COLOR_SETS[aug.color].name} 세트 (${ownedColorCount(aug.color)}/${COLOR_SETS[aug.color].need})</div>
           <div class="augment-box blessing">
             <div class="box-label">축복</div>
             <div class="box-body">${aug.good}</div>
@@ -2359,6 +2469,7 @@
     const chosen = await showAugmentScreen(stageIndex, options);
     augmentState.owned.push(chosen.id);
     chosen.apply(augmentState);
+    checkColorSets();
     renderAll();
   }
 
@@ -2688,6 +2799,18 @@
       codexBody.appendChild(item);
     });
 
+    // 증강 색상 세트 안내
+    const setTitle = document.createElement('div');
+    setTitle.className = 'codex-tier-title t2';
+    setTitle.textContent = '🧩 증강 색상 세트 (같은 색 증강 2개 수집 시 발동)';
+    codexBody.appendChild(setTitle);
+    Object.values(COLOR_SETS).forEach((set) => {
+      const item = document.createElement('div');
+      item.className = 'codex-item';
+      item.innerHTML = `<span class="cx-name">${set.icon} ${set.name} 세트</span><span class="cx-desc"><span class="good">${set.bonusText}</span></span>`;
+      codexBody.appendChild(item);
+    });
+
     [1, 2, 3].forEach((tier) => {
       const title = document.createElement('div');
       title.className = `codex-tier-title t${tier}`;
@@ -2697,7 +2820,7 @@
         const item = document.createElement('div');
         item.className = 'codex-item';
         item.innerHTML = `
-          <span class="cx-name">${aug.name}</span>
+          <span class="cx-name">${COLOR_SETS[aug.color] ? COLOR_SETS[aug.color].icon + ' ' : ''}${aug.name}</span>
           <span class="cx-desc"><span class="good">축복: ${aug.good}</span><br><span class="bad">저주: ${aug.bad}</span></span>
           ${augmentState.owned.includes(aug.id) ? '<span class="cx-owned">보유중</span>' : ''}
         `;
