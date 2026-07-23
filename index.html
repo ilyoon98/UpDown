@@ -576,11 +576,12 @@
   /* 덱 진행 바: 채워질수록 진행. 눈금 = 증강 등장 지점 */
   .deck-progress {
     position: relative;
-    width: 260px;
-    height: 10px;
+    width: 420px;
+    max-width: 88vw;
+    height: 14px;
     background: #33334a;
     border-radius: 999px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
   }
   .deck-progress-fill {
     height: 100%;
@@ -590,18 +591,20 @@
   }
   .deck-marker {
     position: absolute;
-    top: -3px;
+    top: -5px;
     width: 4px;
-    height: 16px;
+    height: 24px;
     border-radius: 2px;
-    background: #666;
+    background: #777;
     transform: translateX(-50%);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
   }
   .deck-marker.next {
     background: var(--gold);
-    box-shadow: 0 0 8px rgba(255, 209, 102, 0.9);
+    width: 6px;
+    box-shadow: 0 0 12px rgba(255, 209, 102, 1);
   }
-  .deck-marker.passed { background: #3a3a52; }
+  .deck-marker.passed { background: #44445c; opacity: 0.5; height: 18px; top: -2px; }
 
   .prophecy-hint {
     font-size: 15px;
@@ -1150,7 +1153,6 @@
     #shopBtn { padding: 12px 28px; font-size: 16px; }
     .card-peek-btn { font-size: 14px; padding: 10px 22px; margin: -8px 0 10px; }
     .combo-badge { font-size: 18px; }
-    .deck-progress { width: 200px; }
     .message { font-size: 17px; }
 
     /* 사이드 패널 (룰렛/활성 효과/보유 증강/QA): 한 열 풀폭 */
@@ -1290,7 +1292,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.12</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.13</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
