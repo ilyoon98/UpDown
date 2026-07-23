@@ -1302,6 +1302,26 @@
     pointer-events: none;
     z-index: 5500;
   }
+  /* 새 버전 알림 토스트 */
+  .update-toast {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 7000;
+    background: linear-gradient(135deg, #d4a017, #ffd166);
+    color: #1e1e2e;
+    padding: 14px 28px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 800;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    animation: pulseBtn 1.4s ease infinite;
+  }
+  .update-toast.show { display: block; }
+
   .fx-float {
     position: fixed;
     pointer-events: none;
@@ -1315,7 +1335,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.14</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.15</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
@@ -1409,6 +1429,7 @@
 </div>
 
 <button type="button" class="peek-btn" id="peekBtn">👁 화면 잠깐 보기</button>
+<button type="button" class="update-toast" id="updateToast">🔄 새 버전이 나왔어요! 눌러서 업데이트</button>
 
 <div class="codex-overlay" id="codexOverlay">
   <div class="codex-modal">
@@ -3449,6 +3470,30 @@
       e.preventDefault();
       guess('down');
     }
+  });
+
+  // ---------------------------------------------------------------------
+  // 새 버전 감지: 5분마다(그리고 탭에 돌아올 때) 서버의 버전을 확인해서
+  // 다르면 업데이트 토스트를 띄운다. 누르면 새로고침.
+  // ---------------------------------------------------------------------
+  const updateToast = document.getElementById('updateToast');
+  const CURRENT_VERSION = document.getElementById('versionTag').textContent.trim();
+
+  async function checkForUpdate() {
+    try {
+      const res = await fetch(location.href, { cache: 'no-store' });
+      const text = await res.text();
+      const m = text.match(/id="versionTag">(v[\d.]+)</);
+      if (m && m[1] !== CURRENT_VERSION) {
+        updateToast.textContent = `🔄 새 버전 ${m[1]} 업데이트! 눌러서 새로고침`;
+        updateToast.classList.add('show');
+      }
+    } catch (e) { /* 오프라인/로컬 파일이면 조용히 무시 */ }
+  }
+  updateToast.addEventListener('click', () => location.reload());
+  setInterval(checkForUpdate, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForUpdate();
   });
 
   buildCardGrid();
