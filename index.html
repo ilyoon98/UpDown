@@ -1157,14 +1157,24 @@
   .card-peek-btn:hover { filter: brightness(1.15); }
   .card-peek-btn.show { display: inline-block; }
 
-  .card-peek-hint {
-    display: none;
-    color: #7bb7ff;
-    font-size: 18px;
+  /* 투시로 공개된 카드: 파란 점선 테두리 + '투시' 라벨 */
+  .card.peeked {
+    outline: 3px dashed #4a8cff;
+    outline-offset: 3px;
+    box-shadow: 0 0 26px rgba(74, 140, 255, 0.65);
+  }
+  .card.peeked::before {
+    content: '🔍 투시';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
     font-weight: 800;
-    text-align: center;
-    margin: -6px 0 12px;
-    text-shadow: 0 0 12px rgba(74, 140, 255, 0.5);
+    color: #2364e8;
+    background: rgba(74, 140, 255, 0.15);
+    padding: 2px 10px;
+    border-radius: 999px;
   }
 
   /* ---------------- 이펙트 레이어 ---------------- */
@@ -1199,7 +1209,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.5</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.6</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
@@ -1221,7 +1231,6 @@
     </div>
 
     <button type="button" class="card-peek-btn" id="cardPeekBtn">🔍 다음 카드 확인</button>
-    <p class="card-peek-hint" id="cardPeekHint"></p>
 
     <div class="message" id="message"></div>
 
@@ -1865,7 +1874,6 @@
   const nextAugmentHintEl = document.getElementById('nextAugmentHint');
   const spinFunBtn = document.getElementById('spinFunBtn');
   const cardPeekBtn = document.getElementById('cardPeekBtn');
-  const cardPeekHint = document.getElementById('cardPeekHint');
   let cylinderRotation = 0;
   let rouletteBusy = false;
 
@@ -2059,26 +2067,25 @@
     }
   }
 
-  // 카드 투시: 충전형 버튼. 매 턴 지난 힌트는 숨긴다.
+  // 카드 투시: 충전형 버튼. 사용하면 우측 카드가 실제로 공개된다.
+  let peekActive = false; // 이번 턴에 이미 투시했는지 (중복 소모 방지)
+
   function refreshCardPeekUI() {
     const show = augmentState.hasCardPeek && augmentState.peekCharges > 0;
     cardPeekBtn.textContent = `🔍 다음 카드 확인 (${augmentState.peekCharges}회)`;
-    cardPeekBtn.classList.toggle('show', show);
-    cardPeekHint.style.display = 'none';
+    cardPeekBtn.classList.toggle('show', show && !peekActive);
   }
 
   cardPeekBtn.addEventListener('click', () => {
-    if (cardPeekHint.style.display === 'block') {
-      cardPeekHint.style.display = 'none';
-      return;
-    }
-    if (deck.length === 0 || augmentState.peekCharges <= 0) return;
+    if (peekActive || deck.length === 0 || augmentState.peekCharges <= 0) return;
     augmentState.peekCharges--;
+    peekActive = true;
     const top = deck[deck.length - 1];
-    cardPeekHint.textContent = `🔍 다음 카드: ${top.number} ${top.label}`;
-    cardPeekHint.style.display = 'block';
-    cardPeekBtn.textContent = `🔍 다음 카드 확인 (${augmentState.peekCharges}회)`;
-    if (augmentState.peekCharges <= 0) cardPeekBtn.classList.remove('show');
+    renderCard(nextCardEl, top);
+    nextCardEl.classList.add('peeked', 'flip');
+    const c = fx.centerOf(nextCardEl);
+    fx.burst(c.x, c.y, { count: 18, colors: ['#4a8cff', '#7bb7ff', '#fff'], spread: 100 });
+    refreshCardPeekUI();
     renderOwnedAugments();
     sfx('tie');
   });
@@ -2801,6 +2808,7 @@
     currentCard = deck.pop();
     streak = 0;
     runBest = 0;
+    peekActive = false;
     resultOverlay.classList.remove('show');
     augmentState = createInitialAugmentState();
     renderCard(currentCardEl, currentCard);
@@ -2898,6 +2906,7 @@
     const prevStreak = streak;
     const next = deck.pop();
     augmentState.cardsAdvanced++;
+    peekActive = false; // 새 카드가 공개되므로 투시 상태 해제
     renderCard(nextCardEl, next);
     markUsed(next);
 
