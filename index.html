@@ -973,7 +973,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.5.1</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.5.2</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1993,10 +1993,13 @@
       died = Math.random() < (bullets / TOTAL_CHAMBERS) * mercyMultiplier(failNum);
     }
 
-    // 장전 위치를 정하고, 결과에 맞는 챔버에 착탄시킨다
+    // 장전 위치를 정하고, 결과에 맞는 챔버에 착탄시킨다.
+    // 강제 생존(생존 본능 등)은 "총알에 맞았지만 효과로 살아남는" 연출이므로
+    // 일부러 총알 챔버에 착탄시킨다.
     const indices = Array.from({ length: TOTAL_CHAMBERS }, (_, i) => i);
     const bulletSet = new Set(shufflePick(indices, bullets));
-    const candidates = indices.filter((i) => bulletSet.has(i) === died);
+    const landOnBullet = forced ? true : died;
+    const candidates = indices.filter((i) => bulletSet.has(i) === landOnBullet);
     const landedIndex = candidates[Math.floor(Math.random() * candidates.length)];
 
     rouletteSub.textContent = `총알 ${bullets}발 장전... 방아쇠를 당깁니다...`;
@@ -2019,21 +2022,31 @@
       fx.flash('rgba(230, 57, 70, 0.45)', 500);
       fx.shake(true);
       sfx('death');
+    } else if (forced) {
+      // 강제 생존: 총알 챔버에 착탄 → "탕!" → 효과가 살려주는 2단계 연출
+      rouletteResult.textContent = '💥 탕!';
+      rouletteResult.className = 'roulette-result death';
+      roulettePanel.classList.add('shake');
+      fx.flash('rgba(230, 57, 70, 0.4)', 400);
+      fx.shake(true);
+      sfx('death');
+      await new Promise((r) => setTimeout(r, 900));
+
+      roulettePanel.classList.remove('shake');
+      rouletteResult.textContent = forced.remaining > 0
+        ? `✨ '${forced.source}' 효과로 생존! (${forced.remaining}회 남음)`
+        : `✨ '${forced.source}' 효과로 생존!`;
+      rouletteResult.className = 'roulette-result revive';
+      const c = fx.centerOf(roulettePanel);
+      fx.burst(c.x, c.y, { count: 40, colors: ['#ffd166', '#5fd8c4', '#fff'], spread: 180, size: 10 });
+      fx.flash('rgba(255, 209, 102, 0.35)', 500);
+      sfx('shield');
     } else {
       landed.classList.add('empty');
-      if (forced) {
-        rouletteResult.textContent = forced.remaining > 0
-          ? `✨ '${forced.source}' 효과로 생존! (${forced.remaining}회 남음)`
-          : `✨ '${forced.source}' 효과로 생존!`;
-        const c = fx.centerOf(roulettePanel);
-        fx.burst(c.x, c.y, { count: 24, colors: ['#ffd166', '#5fd8c4', '#fff'], spread: 140 });
-        sfx('shield');
-      } else {
-        rouletteResult.textContent = '😮‍💨 찰칵... 생존했습니다';
-        sfx('survive');
-      }
+      rouletteResult.textContent = '😮‍💨 찰칵... 생존했습니다';
       rouletteResult.classList.add('survive');
       fx.flash('rgba(255,255,255,0.18)', 250);
+      sfx('survive');
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1200));
