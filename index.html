@@ -946,7 +946,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.4.1</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.4.2</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1072,7 +1072,7 @@
         <div class="st-icon">🔫</div>
         <div>
           <div class="st-title">틀리면 러시안 룰렛</div>
-          <div class="st-desc">처음 2번은 총알이 없어 안전. 실패가 쌓일수록 위험해집니다.</div>
+          <div class="st-desc">6연발 실린더에 총알 1발. 방아쇠를 당기고 살아남으세요.</div>
         </div>
       </div>
       <div class="start-step">
@@ -1796,26 +1796,21 @@
     });
   }
 
-  // 자비 곡선: 몇 번째 룰렛 이벤트냐에 따라 기본 위험도가 달라진다.
-  // 1~2회차: 총알 0발 (절대 사망 없음)
-  // 3회차: 1발 / 10챔버 (10%)
-  // 4회차: 1발 / 8챔버 (12.5%)
-  // 5회차~: 1발 / 6챔버 (16.7%)
-  // 증강 저주 총알은 이 기본값에 추가된다.
-  function mercyForFailure(n) {
-    if (n <= 2) return { bullets: 0, chambers: 6 };
-    if (n === 3) return { bullets: 1, chambers: 10 };
-    if (n === 4) return { bullets: 1, chambers: 8 };
-    return { bullets: 1, chambers: 6 };
+  // 숨겨진 자비 곡선: 몇 번째 룰렛 이벤트냐에 따라 실제 사망 확률에
+  // 배율이 곱해진다. 화면에는 절대 드러내지 않는다 — 표시된 총알보다
+  // 실제로 더 잘 살아남아서 유저는 "운이 좋다"고만 느끼게 된다.
+  // 1~2회차: ×0 (절대 사망 없음) / 3회차: ×0.6 / 4회차: ×0.75 / 5회차~: ×1
+  function mercyMultiplier(n) {
+    if (n <= 2) return 0;
+    if (n === 3) return 0.6;
+    if (n === 4) return 0.75;
+    return 1;
   }
 
-  // 다음 실패 시 위험도를 룰렛 패널에 미리 보여준다 (평상시 문구)
+  // 평상시 룰렛 패널 문구: 장전될 총알 수만 보여준다 (자비 곡선은 비공개)
   function updateRouletteSub() {
-    const m = mercyForFailure(augmentState.failEvents + 1);
-    const b = Math.min(m.bullets + augmentState.bulletCurses, m.chambers - 1);
-    rouletteSub.textContent = b === 0
-      ? '🍀 지금 실패해도 총알 0발 — 안전'
-      : `다음 실패: 총알 ${b}발 / ${m.chambers}챔버`;
+    const b = Math.min(1 + augmentState.bulletCurses, TOTAL_CHAMBERS - 1);
+    rouletteSub.textContent = `틀리면 방아쇠를 당깁니다 (총알 ${b}발)`;
   }
 
   // 챔버 그리기 (개수 가변)
@@ -1894,41 +1889,36 @@
     rouletteBusy = true;
     spinFunBtn.disabled = true;
 
-    // 자비 곡선 기반 총알 수 + 챔버 수 계산
-    const mercy = mercyForFailure(failNum);
-    const chamberCount = mercy.chambers;
-    let bullets = mercy.bullets + augmentState.bulletCurses;
+    // 표시용 총알 수 (실린더는 항상 6챔버)
+    let bullets = 1 + augmentState.bulletCurses;
     if (forced && forced.doubleVisual) bullets = Math.max(bullets, 2);
-    if (forced && forced.died) bullets = Math.max(bullets, 1); // 즉사 계약은 최소 1발
     if (!forced && augmentState.pendingBulletBonus > 0) {
       bullets += augmentState.pendingBulletBonus;
       augmentState.pendingBulletBonus = 0;
     }
-    bullets = Math.min(bullets, chamberCount - 1); // 최소 1칸은 비워둔다
+    bullets = Math.min(bullets, TOTAL_CHAMBERS - 1); // 최소 1칸은 비워둔다
 
-    buildCylinder(chamberCount);
+    buildCylinder(TOTAL_CHAMBERS);
     const chambers = chambersGroup.querySelectorAll('.chamber');
     rouletteResult.textContent = '';
     rouletteResult.className = 'roulette-result';
     roulettePanel.classList.remove('shake');
 
-    // 실제 장전
-    const indices = Array.from({ length: chamberCount }, (_, i) => i);
-    const bulletSet = new Set(shufflePick(indices, bullets));
-
-    // 착탄 챔버 결정
-    let landedIndex;
+    // 실제 사망 판정: 표시 확률 × 숨겨진 자비 배율
+    let died;
     if (forced) {
-      const candidates = indices.filter((i) => bulletSet.has(i) === forced.died);
-      landedIndex = candidates[Math.floor(Math.random() * candidates.length)];
+      died = forced.died;
     } else {
-      landedIndex = Math.floor(Math.random() * chamberCount);
+      died = Math.random() < (bullets / TOTAL_CHAMBERS) * mercyMultiplier(failNum);
     }
-    const died = bulletSet.has(landedIndex);
 
-    rouletteSub.textContent = bullets === 0
-      ? '🍀 아직 총알이 없습니다... 방아쇠를 당깁니다'
-      : `총알 ${bullets}발 / ${chamberCount}챔버... 방아쇠를 당깁니다...`;
+    // 장전 위치를 정하고, 결과에 맞는 챔버에 착탄시킨다
+    const indices = Array.from({ length: TOTAL_CHAMBERS }, (_, i) => i);
+    const bulletSet = new Set(shufflePick(indices, bullets));
+    const candidates = indices.filter((i) => bulletSet.has(i) === died);
+    const landedIndex = candidates[Math.floor(Math.random() * candidates.length)];
+
+    rouletteSub.textContent = `총알 ${bullets}발 장전... 방아쇠를 당깁니다...`;
 
     sfx('spin');
     await spinCylinder(landedIndex);
@@ -1958,9 +1948,7 @@
         fx.burst(c.x, c.y, { count: 24, colors: ['#ffd166', '#5fd8c4', '#fff'], spread: 140 });
         sfx('shield');
       } else {
-        rouletteResult.textContent = bullets === 0
-          ? '🍀 찰칵! 총알이 없었습니다'
-          : '😮‍💨 찰칵... 생존했습니다';
+        rouletteResult.textContent = '😮‍💨 찰칵... 생존했습니다';
         sfx('survive');
       }
       rouletteResult.classList.add('survive');
