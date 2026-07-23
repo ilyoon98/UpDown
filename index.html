@@ -273,13 +273,76 @@
   .combo-badge.pop { animation: comboPop 0.35s ease; }
 
   .util-row { display: flex; gap: 10px; margin-bottom: 8px; }
-  #codexBtn {
+  #codexBtn, #shopBtn {
     background: #3a3a52;
     color: #ccc;
     padding: 9px 20px;
     font-size: 14px;
   }
-  #codexBtn:hover { background: #47476a; }
+  #codexBtn:hover, #shopBtn:hover { background: #47476a; }
+  #shopBtn.affordable {
+    background: #4a3d18;
+    color: var(--gold);
+    box-shadow: 0 0 12px rgba(255, 209, 102, 0.3);
+  }
+
+  /* 색 자원 표시 바 */
+  .resource-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .resource-pill {
+    font-size: 15px;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: #2a2a3c;
+    border: 1px solid #3a3a52;
+  }
+  .resource-pill.r-red    { color: #ff9d9d; }
+  .resource-pill.r-blue   { color: #7bb7ff; }
+  .resource-pill.r-green  { color: #5fd8c4; }
+  .resource-pill.r-yellow { color: #ffd166; }
+
+  /* 상점 오버레이 */
+  .shop-modal { max-width: 560px; }
+  .shop-resources {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .shop-items { display: flex; flex-direction: column; gap: 8px; }
+  .shop-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #3a3a52;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .shop-item .si-info { flex: 1; text-align: left; }
+  .shop-item .si-name { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
+  .shop-item .si-desc { font-size: 13px; color: #aab; }
+  .shop-item .si-cost { display: flex; gap: 4px; flex-shrink: 0; }
+  .cost-chip {
+    font-size: 13px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #2a2a3c;
+  }
+  .cost-chip.lack { opacity: 0.4; text-decoration: line-through; }
+  .shop-item .si-buy {
+    background: var(--gold);
+    color: #1e1e2e;
+    padding: 8px 18px;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .shop-item .si-buy:disabled { background: #444; color: #888; }
 
   /* 증강 도감 오버레이 */
   .codex-overlay {
@@ -1082,7 +1145,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.8.2</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.0</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1109,8 +1172,10 @@
     <p class="kbd-hint">키보드 ↑ / ↓ 로도 플레이할 수 있어요</p>
     <div class="util-row">
       <button id="restartBtn">🔄 처음부터 다시</button>
+      <button type="button" id="shopBtn">🛒 상점</button>
       <button type="button" id="codexBtn">📖 증강 도감</button>
     </div>
+    <div class="resource-bar" id="resourceBar"></div>
 
     <p class="deck-count">남은 카드: <span id="deckCount">0</span>장</p>
     <div class="deck-progress"><div class="deck-progress-fill" id="deckProgressFill"></div></div>
@@ -1178,6 +1243,15 @@
   </div>
 </div>
 
+<div class="codex-overlay" id="shopOverlay">
+  <div class="codex-modal shop-modal">
+    <h2>🛒 상점</h2>
+    <div class="shop-resources" id="shopResources"></div>
+    <div class="shop-items" id="shopItems"></div>
+    <button type="button" class="codex-close" id="shopCloseBtn">닫기</button>
+  </div>
+</div>
+
 <div class="codex-overlay" id="resultOverlay">
   <div class="codex-modal result-modal">
     <div class="result-title" id="resultTitle">💀 사망</div>
@@ -1214,8 +1288,8 @@
       <div class="start-step">
         <div class="st-icon">✨</div>
         <div>
-          <div class="st-title">증강을 모아 강해지세요</div>
-          <div class="st-desc">카드를 진행하면 증강 선택이 등장. 강한 힘에는 저주가 따릅니다.</div>
+          <div class="st-title">증강과 상점으로 강해지세요</div>
+          <div class="st-desc">카드를 진행하면 증강 선택이 등장. 색 카드 정답으로 자원을 모아 🛒 상점에서 아이템을 사세요.</div>
         </div>
       </div>
     </div>
@@ -1436,7 +1510,7 @@
       name: '황금 감식안',
       tier: 1,
       color: 'yellow',
-      good: '노랑 카드 정답 보너스 2배 (+2)',
+      good: '노랑 카드 정답 시 🟡 자원 +2',
       bad: '없음',
       apply(s) { s.hasGoldenEye = true; },
     },
@@ -1447,7 +1521,7 @@
       name: '붉은 계약',
       tier: 2,
       color: 'red',
-      good: '빨강 카드 정답 시 콤보 +4',
+      good: '빨강 카드 정답 시 🔴 자원 +2',
       bad: '빨강 카드 오답 시 방아쇠 +2회',
       apply(s) { s.hasRedContract = true; },
     },
@@ -1672,9 +1746,8 @@
       pendingBulletBonus: 0,     // 1회성 추가 총알 (다음 실패 때 소모)
       pendingBonusPicks: 0,      // 악마의 거래: 추가 증강 선택 횟수
       rerollCharges: 2,
-      // ---- 색상 시스템 ----
-      blueGauge: 0,              // 파랑 정답 누적 (3개 → 투시 +1)
-      greenGauge: 0,             // 초록 정답 누적 (3개 → 방패 +1)
+      // ---- 색상 자원 시스템 ----
+      resources: { red: 0, blue: 0, green: 0, yellow: 0 }, // 색 카드 정답으로 획득, 상점에서 소비
       lastColor: null,           // 직전 정답 카드 색
       sameColorRun: 0,           // 같은 색 연속 정답 수 (색채 공명용)
       rainbowSet: new Set(),     // 무지개 축복: 수집한 색
@@ -1758,21 +1831,21 @@
     return arr;
   }
 
-  // 색상 효과 뱃지: 고유명사 + 호버 설명 (증강 보유 시 수치 반영)
+  // 색상 자원 뱃지: 고유명사 + 호버 설명 (증강 보유 시 수치 반영)
   function suitBadgeInfo(suit) {
     const s = augmentState;
     switch (suit) {
-      case 'red': return { label: '🔥 도박', tip: `정답 시 콤보 +${s.hasRedContract ? 4 : 2}, 오답 시 방아쇠 +${s.hasRedContract ? 2 : 1}회. 하이리스크 하이리턴!` };
-      case 'yellow': return { label: '💰 황금', tip: `정답 시 콤보 +${s.hasGoldenEye ? 2 : 1}. 리스크 없는 안정 보너스.` };
-      case 'blue': return { label: '📘 지혜', tip: '정답 3회 모으면 카드 투시(다음 카드 미리 보기) +1회.' };
-      case 'green': return { label: '🌿 생명', tip: '정답 3회 모으면 룰렛 방패(실패 1회 룰렛 면제) +1회.' };
+      case 'red': return { label: '🔥 정열', tip: `정답 시 🔴 자원 +${s.hasRedContract ? 2 : 1}. 상점에서 콤보 부스트 구매에 사용.${s.hasRedContract ? ' (붉은 계약: 오답 시 방아쇠 +2회)' : ''}` };
+      case 'yellow': return { label: '💰 황금', tip: `정답 시 🟡 자원 +${s.hasGoldenEye ? 2 : 1}. 상점에서 리롤 구매에 사용.` };
+      case 'blue': return { label: '📘 지혜', tip: '정답 시 🔵 자원 +1. 상점에서 카드 투시 구매에 사용.' };
+      case 'green': return { label: '🌿 생명', tip: '정답 시 🟢 자원 +1. 상점에서 룰렛 방패 구매에 사용.' };
       default: return null;
     }
   }
 
   // 특별 숫자 효과 뱃지
   function numberBadgeInfo(n) {
-    if (n === 1 || n === 10) return { label: '⭐ 극단', tip: '정답 시 지혜·생명 게이지가 +1씩 충전됩니다.' };
+    if (n === 1 || n === 10) return { label: '⭐ 극단', tip: '정답 시 이 카드 색의 자원을 1개 더 받습니다 (총 +2).' };
     if (n === 5 || n === 6) return { label: '🎲 승부수', tip: '정답 시 콤보 +2. 중앙값은 맞히기 어려운 만큼 보상도 큽니다.' };
     if (n === 7) return { label: '🍀 럭키세븐', tip: '정답 시 콤보 +3!' };
     return null;
@@ -1815,29 +1888,12 @@
     comboBadge.classList.toggle('lv4', streak >= 20);
   }
 
-  // 색 게이지 1칸 충전 (3칸 완성 시 보상 지급). floats 배열에 연출 텍스트 추가.
-  function tickGauge(kind, floats) {
-    const s = augmentState;
-    if (kind === 'blue') {
-      s.blueGauge++;
-      if (s.blueGauge >= 3) {
-        s.blueGauge = 0;
-        s.hasCardPeek = true;
-        s.peekCharges++;
-        floats.push(['🔵 카드 투시 +1회!', '#7bb7ff']);
-      } else {
-        floats.push([`🔵 지혜 ${s.blueGauge}/3`, '#7bb7ff']);
-      }
-    } else {
-      s.greenGauge++;
-      if (s.greenGauge >= 3) {
-        s.greenGauge = 0;
-        s.shieldCharges++;
-        floats.push(['🟢 룰렛 방패 +1회!', '#5fd8c4']);
-      } else {
-        floats.push([`🟢 생명 ${s.greenGauge}/3`, '#5fd8c4']);
-      }
-    }
+  // 색 자원 획득. floats 배열에 연출 텍스트 추가.
+  const RESOURCE_ICON = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡' };
+  const RESOURCE_FX = { red: '#ff7b7b', blue: '#7bb7ff', green: '#5fd8c4', yellow: '#ffd166' };
+  function addResource(color, amount, floats) {
+    augmentState.resources[color] += amount;
+    floats.push([`${RESOURCE_ICON[color]} 자원 +${amount}`, RESOURCE_FX[color]]);
   }
 
   // 콤보 배지 팝 애니메이션 재생
@@ -2037,11 +2093,8 @@
       const left = s.forcedRouletteEvery - (s.correctCount % s.forcedRouletteEvery);
       items.push({ cls: 'neutral', text: `🎲 광기의 축복: 정답 ${left}회 후 강제 룰렛`, tip: `정답을 ${s.forcedRouletteEvery}회 맞힐 때마다 실패하지 않아도 강제로 룰렛을 돌립니다. 콤보는 유지됩니다.` });
     }
-    // 색상 효과 (항상 표시 — 색상 시스템 학습용)
-    items.push({ cls: 'neutral', text: `🔴 빨강 카드: 정답 +${s.hasRedContract ? 4 : 2} / 오답 방아쇠 +${s.hasRedContract ? 2 : 1}`, tip: '빨강 카드를 맞히면 콤보를 추가로 얻지만, 빨강 카드에서 틀리면 방아쇠를 더 당깁니다. 하이리스크 하이리턴!' });
-    items.push({ cls: 'neutral', text: `🟡 노랑 카드: 정답 +${s.hasGoldenEye ? 2 : 1}`, tip: '노랑 카드를 맞히면 콤보를 추가로 얻습니다. 리스크 없는 안정 보너스.' });
-    items.push({ cls: 'neutral', text: `🔵 지혜 게이지 ${s.blueGauge}/3 → 투시 +1`, tip: '파랑 카드를 정답으로 3회 맞히면 카드 투시(다음 카드 미리 보기) 1회를 얻습니다.' });
-    items.push({ cls: 'neutral', text: `🟢 생명 게이지 ${s.greenGauge}/3 → 방패 +1`, tip: '초록 카드를 정답으로 3회 맞히면 룰렛 방패(실패 1회 룰렛 면제) 1회를 얻습니다.' });
+    // 색상 자원 안내
+    items.push({ cls: 'neutral', text: '🎨 색 카드 정답 → 해당 색 자원 +1', tip: '정답으로 뒤집은 카드의 색 자원을 얻습니다. 모인 자원은 🛒 상점에서 아이템 구매에 사용하세요. 극단(1·10) 카드는 +2!' });
     if (s.hasResonance && s.sameColorRun >= 2) {
       items.push({ cls: 'buff', text: `🌀 색채 공명: ${s.sameColorRun}연속 진행 중`, tip: '같은 색을 연속으로 맞히는 중입니다. 연속이 길수록 추가 콤보가 커지고(2연속 +1, 3연속 +2...), 다른 색이 나오거나 실패하면 초기화됩니다.' });
     }
@@ -2089,6 +2142,7 @@
     updateButtons();
     updateRouletteSub();
     renderActiveEffects();
+    renderResourceBar();
     renderMemoryHint();
     renderProphecyHint();
     renderNextAugmentHint();
@@ -2787,21 +2841,11 @@
       let gain = 1 + augmentState.streakBonus + closeBonus;
       const colorFloats = []; // [텍스트, 색상]
 
-      // ---- 색상 효과 (뒤집힌 카드의 색 기준) ----
+      // ---- 색상 자원 획득 (뒤집힌 카드의 색 기준) ----
       const col = next.suit;
-      if (col === 'yellow') {
-        const y = augmentState.hasGoldenEye ? 2 : 1;
-        gain += y;
-        colorFloats.push([`🟡 황금 +${y}`, '#ffd166']);
-      } else if (col === 'red') {
-        const r = augmentState.hasRedContract ? 4 : 2;
-        gain += r;
-        colorFloats.push([`🔴 도박 성공 +${r}`, '#ff7b7b']);
-      } else if (col === 'blue') {
-        tickGauge('blue', colorFloats);
-      } else if (col === 'green') {
-        tickGauge('green', colorFloats);
-      }
+      let resourceGain = 1;
+      if (col === 'yellow' && augmentState.hasGoldenEye) resourceGain = 2;
+      if (col === 'red' && augmentState.hasRedContract) resourceGain = 2;
 
       // ---- 특별 숫자 효과 ----
       const num = next.number;
@@ -2812,10 +2856,10 @@
         gain += 3;
         colorFloats.push(['🍀 럭키세븐 +3', '#7fe37f']);
       } else if (num === 1 || num === 10) {
-        colorFloats.push(['⭐ 극단의 보상 — 게이지 +1', '#ffd166']);
-        tickGauge('blue', colorFloats);
-        tickGauge('green', colorFloats);
+        resourceGain += 1;
+        colorFloats.push(['⭐ 극단의 보상 — 자원 추가!', '#ffd166']);
       }
+      addResource(col, resourceGain, colorFloats);
 
       // 색채 공명: 같은 색 연속 정답
       augmentState.sameColorRun = augmentState.lastColor === col ? augmentState.sameColorRun + 1 : 1;
@@ -2893,13 +2937,12 @@
       sfx('tie');
     } else {
       nextCardEl.classList.add('glow-lose');
-      // 색 연속 기록 초기화 + 빨강 카드의 대가
+      // 색 연속 기록 초기화 + 붉은 계약의 대가
       augmentState.sameColorRun = 0;
       augmentState.lastColor = null;
-      if (next.suit === 'red') {
-        const extra = augmentState.hasRedContract ? 2 : 1;
-        augmentState.pendingExtraPulls += extra;
-        setMessage(`틀렸습니다! 🔴 빨강의 대가 — 방아쇠 +${extra}회!`, 'lose');
+      if (next.suit === 'red' && augmentState.hasRedContract) {
+        augmentState.pendingExtraPulls += 2;
+        setMessage('틀렸습니다! 🔴 붉은 계약의 대가 — 방아쇠 +2회!', 'lose');
       } else {
         setMessage('틀렸습니다! 방아쇠를 당깁니다...', 'lose');
       }
@@ -2957,6 +3000,103 @@
   restartBtn.addEventListener('click', startGame);
 
   // ---------------------------------------------------------------------
+  // 상점: 색 자원을 소비해 아이템을 구매한다
+  // ---------------------------------------------------------------------
+  const SHOP_ITEMS = [
+    { id: 'peek', name: '🔍 카드 투시 +1', desc: '다음 카드를 미리 확인 (1회)', cost: { blue: 2 }, buy(s) { s.hasCardPeek = true; s.peekCharges += 1; } },
+    { id: 'shield', name: '🛡 룰렛 방패 +1', desc: '실패 1회를 룰렛 없이 넘김', cost: { green: 2 }, buy(s) { s.shieldCharges += 1; } },
+    { id: 'reroll', name: '🔄 리롤 +1', desc: '증강 선택 시 카드 교체 1회', cost: { yellow: 2 }, buy(s) { s.rerollCharges += 1; } },
+    { id: 'combo', name: '🔥 콤보 +5', desc: '즉시 콤보 +5 (마일스톤 진행)', cost: { red: 2 }, buy() { /* streak는 구매 처리에서 별도 반영 */ } },
+    { id: 'remove', name: '🧹 총알 제거권 +1', desc: '다음 룰렛에서 총알 -1발', cost: { blue: 1, green: 1 }, buy(s) { s.bulletRemovals += 1; } },
+    { id: 'immunity', name: '💠 죽음 면역 +1', desc: '어떤 죽음이든 1회 무효 (즉사 포함)', cost: { red: 1, blue: 1, green: 1, yellow: 1 }, buy(s) { s.deathImmunityCharges += 1; } },
+  ];
+
+  const shopOverlay = document.getElementById('shopOverlay');
+  const shopResources = document.getElementById('shopResources');
+  const shopItems = document.getElementById('shopItems');
+  const shopBtn = document.getElementById('shopBtn');
+  const shopCloseBtn = document.getElementById('shopCloseBtn');
+  const resourceBar = document.getElementById('resourceBar');
+
+  function canAfford(cost) {
+    return Object.entries(cost).every(([c, n]) => augmentState.resources[c] >= n);
+  }
+
+  function renderResourceBar() {
+    resourceBar.innerHTML = '';
+    ['red', 'blue', 'green', 'yellow'].forEach((c) => {
+      const pill = document.createElement('span');
+      pill.className = `resource-pill r-${c}`;
+      pill.textContent = `${RESOURCE_ICON[c]} ${augmentState.resources[c]}`;
+      resourceBar.appendChild(pill);
+    });
+    // 살 수 있는 아이템이 있으면 상점 버튼 강조
+    shopBtn.classList.toggle('affordable', SHOP_ITEMS.some((it) => canAfford(it.cost)));
+  }
+
+  function renderShop() {
+    shopResources.innerHTML = '';
+    ['red', 'blue', 'green', 'yellow'].forEach((c) => {
+      const pill = document.createElement('span');
+      pill.className = `resource-pill r-${c}`;
+      pill.textContent = `${RESOURCE_ICON[c]} ${augmentState.resources[c]}`;
+      shopResources.appendChild(pill);
+    });
+    shopItems.innerHTML = '';
+    SHOP_ITEMS.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'shop-item';
+      const costHtml = Object.entries(item.cost)
+        .map(([c, n]) => `<span class="cost-chip r-${c} ${augmentState.resources[c] >= n ? '' : 'lack'}">${RESOURCE_ICON[c]}×${n}</span>`)
+        .join('');
+      row.innerHTML = `
+        <div class="si-info">
+          <div class="si-name">${item.name}</div>
+          <div class="si-desc">${item.desc}</div>
+        </div>
+        <div class="si-cost">${costHtml}</div>
+        <button type="button" class="si-buy" ${canAfford(item.cost) ? '' : 'disabled'}>구매</button>
+      `;
+      row.querySelector('.si-buy').addEventListener('click', () => buyItem(item));
+      shopItems.appendChild(row);
+    });
+  }
+
+  function buyItem(item) {
+    if (!canAfford(item.cost)) return;
+    Object.entries(item.cost).forEach(([c, n]) => { augmentState.resources[c] -= n; });
+    item.buy(augmentState);
+    // 콤보 부스트는 전역 streak를 직접 올린다 (마일스톤 판정 포함)
+    if (item.id === 'combo') {
+      streak += 5;
+      if (streak > best) best = streak;
+      if (streak > runBest) runBest = streak;
+      const floats = [];
+      COMBO_MILESTONES.forEach((m, i) => {
+        if (augmentState.milestonesClaimed[i] || streak < m.at) return;
+        augmentState.milestonesClaimed[i] = true;
+        m.grant(augmentState);
+        floats.push([`🏁 콤보 ${m.at} 달성! ${m.text}`, '#ffd166']);
+      });
+      floats.forEach((f, i) => setTimeout(() => fx.float(window.innerWidth / 2, window.innerHeight / 2 - 120 - i * 10, f[0], f[1], 22), i * 250));
+      popCombo();
+    }
+    sfx('pick');
+    fx.float(window.innerWidth / 2, window.innerHeight / 2 - 80, `${item.name} 구매!`, '#ffd166', 24);
+    renderShop();
+    renderAll();
+  }
+
+  shopBtn.addEventListener('click', () => {
+    renderShop();
+    shopOverlay.classList.add('show');
+  });
+  shopCloseBtn.addEventListener('click', () => shopOverlay.classList.remove('show'));
+  shopOverlay.addEventListener('click', (e) => {
+    if (e.target === shopOverlay) shopOverlay.classList.remove('show');
+  });
+
+  // ---------------------------------------------------------------------
   // 증강 도감: 16종 전체를 티어별로 정리해서 보여준다
   // ---------------------------------------------------------------------
   function renderCodex() {
@@ -2968,10 +3108,10 @@
     colorTitle.textContent = '🎨 카드 색상 효과 (기본 규칙)';
     codexBody.appendChild(colorTitle);
     [
-      ['🔴 빨강', '정답 시 콤보 +2 · 오답 시 방아쇠 +1회 (하이리스크)'],
-      ['🟡 노랑', '정답 시 콤보 +1'],
-      ['🔵 파랑', '정답 3회 모으면 카드 투시 +1회'],
-      ['🟢 초록', '정답 3회 모으면 룰렛 방패 +1회'],
+      ['🔴 빨강', '정답 시 🔴 자원 +1 — 콤보 부스트 구매에 사용'],
+      ['🟡 노랑', '정답 시 🟡 자원 +1 — 리롤 구매에 사용'],
+      ['🔵 파랑', '정답 시 🔵 자원 +1 — 카드 투시 구매에 사용'],
+      ['🟢 초록', '정답 시 🟢 자원 +1 — 룰렛 방패 구매에 사용'],
     ].forEach(([name, desc]) => {
       const item = document.createElement('div');
       item.className = 'codex-item';
@@ -2993,6 +3133,19 @@
       item.className = 'codex-item';
       item.innerHTML = `<span class="cx-name">${name}</span><span class="cx-desc">${desc}</span>`;
       codexBody.appendChild(item);
+    });
+
+    // 상점 안내
+    const shopTitle = document.createElement('div');
+    shopTitle.className = 'codex-tier-title t2';
+    shopTitle.textContent = '🛒 상점 (색 자원으로 구매)';
+    codexBody.appendChild(shopTitle);
+    SHOP_ITEMS.forEach((item) => {
+      const costText = Object.entries(item.cost).map(([c, n]) => `${RESOURCE_ICON[c]}×${n}`).join(' ');
+      const row = document.createElement('div');
+      row.className = 'codex-item';
+      row.innerHTML = `<span class="cx-name">${item.name}</span><span class="cx-desc">${item.desc} — <span class="good">${costText}</span></span>`;
+      codexBody.appendChild(row);
     });
 
     // 콤보 마일스톤 안내
@@ -3064,6 +3217,7 @@
     if (e.key === 'Escape') {
       codexOverlay.classList.remove('show');
       resultOverlay.classList.remove('show');
+      shopOverlay.classList.remove('show');
       return;
     }
     if (e.key === 'q' || e.key === 'Q' || e.key === 'ㅂ') {
