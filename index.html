@@ -1168,7 +1168,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.1</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.2</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1751,6 +1751,7 @@
       cardsAdvanced: 0,
       correctCount: 0,          // 정답 누적 (광기의 축복 트리거용)
       failEvents: 0,            // 룰렛 이벤트 누적 (자비 곡선 계산용)
+      nearDeaths: 0,            // 죽을 뻔한 순간 (총알 있는 룰렛 생존, 강제 생존, 부활, 면역)
       streakBonus: 0,           // 정답당 추가 스트릭 (기본 +1에 더해짐)
       hasImperfectMemory: false,
       hasPerfectMemory: false,
@@ -2376,6 +2377,7 @@
       sfx('death');
     } else if (forced) {
       // 강제 생존: 총알 챔버에 착탄 → "탕!" → 효과가 살려주는 2단계 연출
+      augmentState.nearDeaths++;
       rouletteResult.textContent = '💥 탕!';
       rouletteResult.className = 'roulette-result death';
       roulettePanel.classList.add('shake');
@@ -2395,6 +2397,7 @@
       sfx('shield');
     } else {
       landed.classList.add('empty');
+      if (bullets > 0) augmentState.nearDeaths++;
       rouletteResult.textContent = bullets === 0
         ? '🧹 총알이 전부 제거되어 있었다! 찰칵!'
         : '😮‍💨 찰칵... 생존했습니다';
@@ -2416,6 +2419,7 @@
     augmentState.phoenixCharges--;
     renderOwnedAugments();
     if (Math.random() < 0.5) {
+      augmentState.nearDeaths++;
       rouletteResult.textContent = '🕊 불사조의 깃털로 부활!';
       rouletteResult.className = 'roulette-result revive';
       augmentState.bulletCurses += 1; // 부활의 대가
@@ -2453,6 +2457,7 @@
     // 혈맹 세트: 죽음(즉사 포함) 완전 면역
     if (died && augmentState.deathImmunityCharges > 0) {
       augmentState.deathImmunityCharges--;
+      augmentState.nearDeaths++;
       rouletteResult.textContent = '🔴 혈맹의 가호 — 죽음 면역!';
       rouletteResult.className = 'roulette-result revive';
       const c = fx.centerOf(roulettePanel);
@@ -2790,13 +2795,12 @@
     resultCause.textContent = cause || (win ? '덱의 카드를 전부 소진했습니다! (★2: 콤보 25 / ★3: 콤보 50)' : '');
 
     const s = augmentState;
-    const rouletteSurvived = Math.max(0, s.failEvents - (win ? 0 : 1));
     const stats = [
       { label: '이번 판 최고 콤보', value: runBest, highlight: true },
       { label: '역대 최고 기록', value: best, highlight: runBest >= best && runBest > 0 },
       { label: '진행한 카드', value: `${s.cardsAdvanced} / 39` },
       { label: '정답 수', value: s.correctCount },
-      { label: '룰렛 생존', value: `${rouletteSurvived}회` },
+      { label: '💀 죽을 뻔한 순간', value: `${s.nearDeaths}번`, highlight: s.nearDeaths >= 3 },
       { label: '획득 증강', value: `${s.owned.length}개` },
     ];
     resultStats.innerHTML = '';
