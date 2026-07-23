@@ -1144,6 +1144,7 @@
     .card .suit-label { font-size: 17px; margin-top: 4px; }
     .card-badges { gap: 4px; margin-top: 8px; }
     .card-badge { font-size: 11px; padding: 3px 8px; }
+    .card.peeked::before { font-size: 11px; padding: 2px 8px; top: 5px; }
     .controls { gap: 10px; }
     .controls button { padding: 12px 18px; font-size: 16px; }
     #shopBtn { padding: 12px 28px; font-size: 16px; }
@@ -1254,6 +1255,7 @@
     background: rgba(74, 140, 255, 0.15);
     padding: 2px 10px;
     border-radius: 999px;
+    white-space: nowrap;
   }
 
   /* ---------------- 이펙트 레이어 ---------------- */
@@ -1288,7 +1290,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.11</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.12</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
