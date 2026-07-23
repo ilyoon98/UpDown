@@ -234,17 +234,19 @@
   /* 우상단 유틸 버튼 (처음부터 / 도감) */
   .top-utils {
     position: fixed;
-    top: 14px;
-    right: 16px;
+    top: 16px;
+    right: 20px;
     display: flex;
-    gap: 8px;
+    gap: 10px;
     z-index: 100;
   }
   #restartBtn {
     background: #3a3a52;
-    color: #ccc;
-    padding: 8px 16px;
-    font-size: 13px;
+    color: #eee;
+    padding: 13px 26px;
+    font-size: 16px;
+    border: 1px solid #55557a;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   }
   #restartBtn:hover { background: #47476a; }
   #restartBtn.attention {
@@ -283,9 +285,11 @@
   .util-row { display: flex; gap: 10px; margin-bottom: 8px; }
   #codexBtn {
     background: #3a3a52;
-    color: #ccc;
-    padding: 8px 16px;
-    font-size: 13px;
+    color: #eee;
+    padding: 13px 26px;
+    font-size: 16px;
+    border: 1px solid #55557a;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   }
   #codexBtn:hover { background: #47476a; }
 
@@ -1209,7 +1213,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.9.7</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.9.8</span></h1>
 
 <div class="top-utils">
   <button id="restartBtn">🔄 처음부터</button>
