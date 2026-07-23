@@ -1032,7 +1032,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version">v0.7.2</span></h1>
+<h1>업다운 카드 게임 <span class="version">v0.8.0</span></h1>
 
 <div class="layout">
   <div class="game-area">
@@ -1546,6 +1546,16 @@
     },
   };
 
+  // ---------------------------------------------------------------------
+  // 콤보 마일스톤: 콤보가 목표치에 도달하면 생존 보상으로 환급된다 (판당 1회씩)
+  // 점수를 버는 모든 행동이 곧 "클리어를 위한 플레이"가 되도록 하는 장치.
+  // ---------------------------------------------------------------------
+  const COMBO_MILESTONES = [
+    { at: 15, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
+    { at: 30, text: '🧹 총알 제거권 +1', tip: '다음 룰렛에서 총알이 1발 제거됩니다.', grant(s) { s.bulletRemovals += 1; } },
+    { at: 50, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
+  ];
+
   function ownedColorCount(color) {
     return augmentState.owned.filter((id) => {
       const a = AUGMENTS.find((x) => x.id === id);
@@ -1626,6 +1636,8 @@
       // ---- 증강 색상 세트 ----
       setActivated: { red: false, blue: false, green: false, yellow: false },
       deathImmunityCharges: 0,   // 혈맹 세트: 죽음(즉사 포함) 완전 면역
+      milestonesClaimed: [false, false, false], // 콤보 마일스톤 달성 여부
+      bulletRemovals: 0,         // 총알 제거권: 다음 룰렛에서 총알 -1발
     };
   }
   let augmentState = createInitialAugmentState();
@@ -1996,7 +2008,15 @@
       }
     });
     if (s.deathImmunityCharges > 0) {
-      items.push({ cls: 'buff', text: `🔴 죽음 면역 ${s.deathImmunityCharges}회 (즉사 포함)`, tip: '혈맹 세트의 가호 — 어떤 죽음이든(검은 계약의 즉사 포함) 1회 완전히 무효화합니다. 불사조보다 나중에, 최후의 보루로 발동합니다.' });
+      items.push({ cls: 'buff', text: `🔴 죽음 면역 ${s.deathImmunityCharges}회 (즉사 포함)`, tip: '어떤 죽음이든(검은 계약의 즉사 포함) 1회 완전히 무효화합니다. 불사조보다 나중에, 최후의 보루로 발동합니다.' });
+    }
+    if (s.bulletRemovals > 0) {
+      items.push({ cls: 'buff', text: `🧹 총알 제거권 ${s.bulletRemovals}회`, tip: '다음 룰렛에서 총알이 1발 제거됩니다. 총알이 0발이 되면 무조건 생존!' });
+    }
+    // 다음 콤보 마일스톤 안내
+    const nextMs = COMBO_MILESTONES.find((m, i) => !s.milestonesClaimed[i]);
+    if (nextMs) {
+      items.push({ cls: 'neutral', text: `🏁 콤보 ${nextMs.at} 달성 시: ${nextMs.text}`, tip: `콤보(연속 성공)가 ${nextMs.at}에 도달하면 생존 보상을 받습니다. ${nextMs.tip} 판당 1회.` });
     }
     if (items.length === 0) {
       const empty = document.createElement('div');
@@ -2174,6 +2194,14 @@
     }
     bullets = Math.min(bullets, TOTAL_CHAMBERS - 1); // 최소 1칸은 비워둔다
 
+    // 총알 제거권 (콤보 30 마일스톤): 이번 룰렛에서 총알 제거
+    let removedBullets = 0;
+    if (!forced && augmentState.bulletRemovals > 0 && bullets > 0) {
+      removedBullets = Math.min(augmentState.bulletRemovals, bullets);
+      bullets -= removedBullets;
+      augmentState.bulletRemovals -= removedBullets;
+    }
+
     buildCylinder(TOTAL_CHAMBERS);
     const chambers = chambersGroup.querySelectorAll('.chamber');
     rouletteResult.textContent = '';
@@ -2197,7 +2225,9 @@
     const candidates = indices.filter((i) => bulletSet.has(i) === landOnBullet);
     const landedIndex = candidates[Math.floor(Math.random() * candidates.length)];
 
-    rouletteSub.textContent = `총알 ${bullets}발 장전... 방아쇠를 당깁니다...`;
+    rouletteSub.textContent = removedBullets > 0
+      ? `🧹 총알 ${removedBullets}발 제거! ${bullets}발 장전... 방아쇠를 당깁니다...`
+      : `총알 ${bullets}발 장전... 방아쇠를 당깁니다...`;
 
     sfx('spin');
     await spinCylinder(landedIndex);
@@ -2238,7 +2268,9 @@
       sfx('shield');
     } else {
       landed.classList.add('empty');
-      rouletteResult.textContent = '😮‍💨 찰칵... 생존했습니다';
+      rouletteResult.textContent = bullets === 0
+        ? '🧹 총알이 전부 제거되어 있었다! 찰칵!'
+        : '😮‍💨 찰칵... 생존했습니다';
       rouletteResult.classList.add('survive');
       fx.flash('rgba(255,255,255,0.18)', 250);
       sfx('survive');
@@ -2601,9 +2633,15 @@
 
   // 결과 화면: 이번 판 요약 (콤보, 진행도, 획득 증강, 사망 원인)
   function showResultScreen(win, cause) {
-    resultTitle.textContent = win ? '🏆 클리어!' : '💀 사망';
+    if (win) {
+      // 클리어 등급: 이번 판 최고 콤보 기준
+      const stars = runBest >= 50 ? '★★★' : runBest >= 25 ? '★★☆' : '★☆☆';
+      resultTitle.textContent = `🏆 클리어! ${stars}`;
+    } else {
+      resultTitle.textContent = '💀 사망';
+    }
     resultTitle.className = `result-title ${win ? 'win' : 'lose'}`;
-    resultCause.textContent = cause || (win ? '덱의 카드를 전부 소진했습니다!' : '');
+    resultCause.textContent = cause || (win ? '덱의 카드를 전부 소진했습니다! (★2: 콤보 25 / ★3: 콤보 50)' : '');
 
     const s = augmentState;
     const rouletteSurvived = Math.max(0, s.failEvents - (win ? 0 : 1));
@@ -2748,6 +2786,16 @@
       augmentState.correctCount++;
       if (streak > best) best = streak;
       if (streak > runBest) runBest = streak;
+
+      // 콤보 마일스톤 달성 → 생존 보상 지급
+      COMBO_MILESTONES.forEach((m, i) => {
+        if (augmentState.milestonesClaimed[i] || streak < m.at) return;
+        augmentState.milestonesClaimed[i] = true;
+        m.grant(augmentState);
+        colorFloats.push([`🏁 콤보 ${m.at} 달성! ${m.text}`, '#ffd166']);
+        fx.confetti(30);
+        sfx('combo');
+      });
       nextCardEl.classList.add('glow-win');
       if (isTie) {
         setMessage('동점! 독심술로 정답 처리! 🎉', 'win');
@@ -2889,6 +2937,22 @@
       item.innerHTML = `<span class="cx-name">${name}</span><span class="cx-desc">${desc}</span>`;
       codexBody.appendChild(item);
     });
+
+    // 콤보 마일스톤 안내
+    const msTitle = document.createElement('div');
+    msTitle.className = 'codex-tier-title t3';
+    msTitle.textContent = '🏁 콤보 마일스톤 (콤보가 생존이 된다)';
+    codexBody.appendChild(msTitle);
+    COMBO_MILESTONES.forEach((m) => {
+      const item = document.createElement('div');
+      item.className = 'codex-item';
+      item.innerHTML = `<span class="cx-name">콤보 ${m.at}</span><span class="cx-desc"><span class="good">${m.text}</span> — ${m.tip}</span>`;
+      codexBody.appendChild(item);
+    });
+    const gradeItem = document.createElement('div');
+    gradeItem.className = 'codex-item';
+    gradeItem.innerHTML = `<span class="cx-name">클리어 등급</span><span class="cx-desc">최고 콤보 기준 ★1 (클리어) / ★2 (콤보 25) / ★3 (콤보 50)</span>`;
+    codexBody.appendChild(gradeItem);
 
     // 증강 색상 세트 안내
     const setTitle = document.createElement('div');
