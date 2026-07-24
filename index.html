@@ -1353,7 +1353,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.16</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.17</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -1941,7 +1941,20 @@
   let deck = [];
   let currentCard = null;
   let streak = 0;
+
+  // 최고 기록은 localStorage에 저장해서 새로고침/재방문 후에도 유지된다.
+  const BEST_STORAGE_KEY = 'updown_best_streak';
   let best = 0;
+  try {
+    const savedBest = Number(localStorage.getItem(BEST_STORAGE_KEY));
+    if (Number.isFinite(savedBest) && savedBest > 0) best = savedBest;
+  } catch (e) { /* localStorage 접근 불가 환경 무시 */ }
+
+  function setBest(value) {
+    if (value <= best) return;
+    best = value;
+    try { localStorage.setItem(BEST_STORAGE_KEY, String(best)); } catch (e) { /* 저장 불가 환경 무시 */ }
+  }
 
   // 증강 관련 런 상태. 재시작 시 전부 초기화된다.
   function createInitialAugmentState() {
@@ -2137,6 +2150,15 @@
     inputLocked = !enabled;
     upBtn.disabled = !enabled || (currentCard && currentCard.number === 10);
     downBtn.disabled = !enabled || (currentCard && currentCard.number === 1);
+  }
+
+  // 라운드 진행 중(카드 뒤집기~룰렛~증강 선택까지) "처음부터"를 누르면
+  // 옛 라운드의 비동기 흐름이 새로 초기화된 deck/augmentState를 계속
+  // 건드려서 상태가 오염된다. roundBusy가 true인 동안은 재시작을 막는다.
+  let roundBusy = false;
+  function setRoundBusy(busy) {
+    roundBusy = busy;
+    restartBtn.disabled = busy;
   }
 
   // 확률의 눈: 업/다운 버튼에 성공 확률 % 표시
@@ -2663,8 +2685,11 @@
   // 룰렛 이벤트 1건 처리(방아쇠 횟수 반영 + 불사조). 최종 사망 여부 반환.
   // failEvents는 이벤트당 1회만 증가 — 같은 이벤트의 연속 방아쇠(예언/도박사)는
   // 같은 자비 단계를 쓴다.
-  async function resolveRouletteEvent() {
-    augmentState.failEvents++;
+  // countsForMercy=false(광기의 축복 등 강제 트리거)면 자비 카운터를 소비하지
+  // 않는다 — 진짜 실수가 아닌데 자비 구간을 갉아먹으면 이후 실제 오답 때
+  // 받아야 할 보호가 줄어들기 때문.
+  async function resolveRouletteEvent(countsForMercy = true) {
+    if (countsForMercy) augmentState.failEvents++;
     const failNum = augmentState.failEvents;
     const forced = consumeForcedBlock();
     let pulls = 1;
@@ -2674,7 +2699,11 @@
     augmentState.pendingExtraPulls = 0;
     let died = false;
     for (let i = 0; i < pulls; i++) {
-      died = await playRoulette(forced, failNum);
+      // 강제 결과(forced)는 딱 1번의 방아쇠만 보호/확정한다. 예언·도박사의
+      // 피로 방아쇠가 늘어난 나머지 발은 진짜 확률로 굴러야 한다 — 안 그러면
+      // 같은 강제 생존이 여러 발에 중복 적용돼 연출이 반복 재생되고
+      // nearDeaths도 부풀려진다.
+      died = await playRoulette(i === 0 ? forced : null, failNum);
       if (died) break;
     }
     died = await tryPhoenix(died);
@@ -2981,6 +3010,7 @@
   }
 
   async function startGame() {
+    setRoundBusy(false);
     deck = buildDeck();
     currentCard = deck.pop();
     streak = 0;
@@ -3079,6 +3109,7 @@
     if (direction === 'up' && upBtn.disabled) return;
     if (direction === 'down' && downBtn.disabled) return;
     setChoiceButtons(false);
+    setRoundBusy(true);
 
     const prevCardCount = augmentState.cardsAdvanced;
     const prevStreak = streak;
@@ -3151,7 +3182,7 @@
 
       streak += gain;
       augmentState.correctCount++;
-      if (streak > best) best = streak;
+      setBest(streak);
       if (streak > runBest) runBest = streak;
 
       // 콤보 마일스톤 달성 → 생존 보상 지급
@@ -3201,6 +3232,11 @@
       nextCardEl.classList.add('flip');
       setMessage('같은 숫자! 무승부 — 다음 카드로 넘어갑니다.', 'tie');
       sfx('tie');
+      // 무승부는 "정답 유지"가 아니므로 같은 색 연속 기록도 끊는다
+      // (오답 분기와 동일하게 처리 — 안 그러면 동점을 사이에 두고도
+      // 색채 공명 연속이 부정확하게 이어진다)
+      augmentState.sameColorRun = 0;
+      augmentState.lastColor = null;
     } else {
       nextCardEl.classList.add('glow-lose');
       // 색 연속 기록 초기화 + 붉은 계약의 대가
@@ -3230,21 +3266,27 @@
 
       if (isFailure) {
         const died = await handleWrongGuess();
-        if (died) return;
+        if (died) {
+          setRoundBusy(false);
+          return;
+        }
       }
 
       // 광기의 축복: 정답 7회마다 강제 룰렛 (스트릭은 유지)
+      // 자비 곡선 카운터는 소비하지 않는다 — 진짜 실수가 아니라 마일스톤
+      // 트리거이므로, 이후 실제 오답의 자비 구간을 갉아먹지 않게 한다.
       if (
         correct === true &&
         augmentState.forcedRouletteEvery &&
         augmentState.correctCount % augmentState.forcedRouletteEvery === 0
       ) {
         setMessage('🎲 광기의 축복 — 운명의 방아쇠를 당깁니다!', 'tie');
-        const died = await resolveRouletteEvent();
+        const died = await resolveRouletteEvent(false);
         renderOwnedAugments();
         if (died) {
           setMessage('💥 광기의 대가로 사망했습니다. 게임 오버.', 'lose');
           endGame(false, '🎲 광기의 축복 — 강제 룰렛에서 사망');
+          setRoundBusy(false);
           return;
         }
         setMessage('😮‍💨 찰칵... 광기를 견뎌냈습니다!', 'tie');
@@ -3252,17 +3294,22 @@
 
       if (deck.length === 0) {
         endGame(true);
+        setRoundBusy(false);
         return;
       }
 
       await maybeOfferAugment(prevCardCount, augmentState.cardsAdvanced);
       setChoiceButtons(true);
+      setRoundBusy(false);
     }, 900);
   }
 
   upBtn.addEventListener('click', () => guess('up'));
   downBtn.addEventListener('click', () => guess('down'));
-  restartBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', () => {
+    if (roundBusy) return; // 라운드 진행 중에는 재시작으로 인한 상태 오염을 막는다
+    startGame();
+  });
 
   // ---------------------------------------------------------------------
   // 상점: 색 자원을 소비해 아이템을 구매한다
@@ -3334,7 +3381,7 @@
     // 콤보 부스트는 전역 streak를 직접 올린다 (마일스톤 판정 포함)
     if (item.id === 'combo') {
       streak += 5;
-      if (streak > best) best = streak;
+      setBest(streak);
       if (streak > runBest) runBest = streak;
       const floats = [];
       COMBO_MILESTONES.forEach((m, i) => {
@@ -3504,6 +3551,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v0.9.17', notes: '최고 기록 저장(새로고침해도 유지) · 진행 중 재시작 방지 · 룰렛 다중 방아쇠/자비 곡선 버그 수정' },
     { v: 'v0.9.16', notes: '우상단에 버전 로그 추가 · 업데이트 알림을 우상단으로 이동' },
     { v: 'v0.9.15', notes: '새 버전 자동 감지 — 배포되면 알림 버튼이 뜨고 눌러서 바로 업데이트' },
     { v: 'v0.9.11~14', notes: '진행 바에 증강 등장 눈금 · 남은 카드/다음 증강 배지 · 진행 바 확대 · 모바일 표시 개선' },
