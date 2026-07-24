@@ -1353,7 +1353,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.17</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.18</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -1712,11 +1712,11 @@
     {
       id: 'odds-eye',
       name: '확률의 눈',
-      tier: 1,
+      tier: 2,
       color: 'blue',
       good: '업/다운 성공 확률을 % 로 표시',
-      bad: '없음',
-      apply(s) { s.hasOddsEye = true; },
+      bad: '실패 시 총알이 1발 더 장전됨 (영구)',
+      apply(s) { s.hasOddsEye = true; s.bulletCurses += 1; },
     },
     {
       id: 'combo-guard',
@@ -1820,7 +1820,7 @@
       name: '무지개 축복',
       tier: 3,
       color: 'yellow',
-      good: '4색 정답 세트를 완성할 때마다 콤보 +10, 리롤 +1',
+      good: '4색 정답 세트를 완성할 때마다 콤보 +6, 리롤 +1',
       bad: '영구 총알 +1발',
       apply(s) { s.hasRainbow = true; s.bulletCurses += 1; },
     },
@@ -1829,10 +1829,10 @@
       name: '검은 계약',
       tier: 3,
       color: 'red',
-      good: '다음 죽음 무효',
+      good: '다음 죽음 2회 무효',
       bad: '그다음 실패는 즉사',
       apply(s) {
-        s.forcedBlocks.push({ type: 'survive', count: 1, afterEffect: null, source: '검은 계약' });
+        s.forcedBlocks.push({ type: 'survive', count: 2, afterEffect: null, source: '검은 계약' });
         s.forcedBlocks.push({ type: 'death', count: 1, afterEffect: null, source: '검은 계약' });
       },
     },
@@ -1841,10 +1841,10 @@
       name: '불멸의 탄창',
       tier: 3,
       color: 'green',
-      good: '다음 5회 무조건 생존',
-      bad: '이후 영구 총알 +1발',
+      good: '다음 3회 무조건 생존',
+      bad: '이후 영구 총알 +2발',
       apply(s) {
-        s.forcedBlocks.push({ type: 'survive', count: 5, afterEffect: 'permanentBullet', visual: 'double', source: '불멸의 탄창' });
+        s.forcedBlocks.push({ type: 'survive', count: 3, afterEffect: 'permanentBullet', visual: 'double', source: '불멸의 탄창' });
       },
     },
     {
@@ -1861,9 +1861,9 @@
       name: '광기의 축복',
       tier: 3,
       color: 'red',
-      good: '정답마다 연속 성공 +3',
-      bad: '정답 7번마다 강제 룰렛 발동',
-      apply(s) { s.streakBonus += 2; s.forcedRouletteEvery = 7; },
+      good: '정답마다 연속 성공 +2',
+      bad: '정답 6번마다 강제 룰렛 발동',
+      apply(s) { s.streakBonus += 1; s.forcedRouletteEvery = 6; },
     },
   ];
 
@@ -1898,9 +1898,9 @@
   // 점수를 버는 모든 행동이 곧 "클리어를 위한 플레이"가 되도록 하는 장치.
   // ---------------------------------------------------------------------
   const COMBO_MILESTONES = [
-    { at: 15, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
-    { at: 30, text: '🧹 총알 제거권 +1', tip: '다음 룰렛에서 총알이 1발 제거됩니다.', grant(s) { s.bulletRemovals += 1; } },
-    { at: 50, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
+    { at: 25, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
+    { at: 50, text: '🧹 총알 제거권 +1', tip: '다음 룰렛에서 총알이 1발 제거됩니다.', grant(s) { s.bulletRemovals += 1; } },
+    { at: 80, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
   ];
 
   function ownedColorCount(color) {
@@ -2470,11 +2470,13 @@
   // 숨겨진 자비 곡선: 몇 번째 룰렛 이벤트냐에 따라 실제 사망 확률에
   // 배율이 곱해진다. 화면에는 절대 드러내지 않는다 — 표시된 총알보다
   // 실제로 더 잘 살아남아서 유저는 "운이 좋다"고만 느끼게 된다.
-  // 1~2회차: ×0 (절대 사망 없음) / 3회차: ×0.6 / 4회차: ×0.75 / 5회차~: ×1
+  // 1회차: ×0 (첫 실수만 무조건 생존) / 2회차: ×0.5 / 3회차: ×0.75 / 4회차~: ×1
+  // (기존엔 2회까지 무조건 생존이라 총알 저주가 사실상 무의미했음 — 리스크를
+  //  살리기 위해 자비 구간을 1회로 줄이고 곧바로 실확률에 가깝게 올린다)
   function mercyMultiplier(n) {
-    if (n <= 2) return 0;
-    if (n === 3) return 0.6;
-    if (n === 4) return 0.75;
+    if (n <= 1) return 0;
+    if (n === 2) return 0.5;
+    if (n === 3) return 0.75;
     return 1;
   }
 
@@ -2542,7 +2544,7 @@
     if (block.count <= 0) {
       augmentState.forcedBlocks.shift();
       if (block.afterEffect === 'oneTimeThird') augmentState.pendingBulletBonus += 1;
-      if (block.afterEffect === 'permanentBullet') augmentState.bulletCurses += 1;
+      if (block.afterEffect === 'permanentBullet') augmentState.bulletCurses += 2;
     }
     return { died: forcedDied, doubleVisual, source: block.source, remaining: block.count };
   }
@@ -3042,13 +3044,13 @@
   function showResultScreen(win, cause) {
     if (win) {
       // 클리어 등급: 이번 판 최고 콤보 기준
-      const stars = runBest >= 50 ? '★★★' : runBest >= 25 ? '★★☆' : '★☆☆';
+      const stars = runBest >= 80 ? '★★★' : runBest >= 40 ? '★★☆' : '★☆☆';
       resultTitle.textContent = `🏆 클리어! ${stars}`;
     } else {
       resultTitle.textContent = '💀 사망';
     }
     resultTitle.className = `result-title ${win ? 'win' : 'lose'}`;
-    resultCause.textContent = cause || (win ? '덱의 카드를 전부 소진했습니다! (★2: 콤보 25 / ★3: 콤보 50)' : '');
+    resultCause.textContent = cause || (win ? '덱의 카드를 전부 소진했습니다! (★2: 콤보 40 / ★3: 콤보 80)' : '');
 
     const s = augmentState;
     const stats = [
@@ -3172,9 +3174,9 @@
         augmentState.rainbowSet.add(col);
         if (augmentState.rainbowSet.size >= 4) {
           augmentState.rainbowSet.clear();
-          gain += 10;
+          gain += 6;
           augmentState.rerollCharges++;
-          colorFloats.push(['🌈 무지개 완성! +10 & 리롤 +1', '#ffd166']);
+          colorFloats.push(['🌈 무지개 완성! +6 & 리롤 +1', '#ffd166']);
           fx.confetti(50);
           sfx('combo');
         }
@@ -3473,7 +3475,7 @@
     });
     const gradeItem = document.createElement('div');
     gradeItem.className = 'codex-item';
-    gradeItem.innerHTML = `<span class="cx-name">클리어 등급</span><span class="cx-desc">최고 콤보 기준 ★1 (클리어) / ★2 (콤보 25) / ★3 (콤보 50)</span>`;
+    gradeItem.innerHTML = `<span class="cx-name">클리어 등급</span><span class="cx-desc">최고 콤보 기준 ★1 (클리어) / ★2 (콤보 40) / ★3 (콤보 80)</span>`;
     codexBody.appendChild(gradeItem);
 
     // 증강 색상 세트 안내
@@ -3551,6 +3553,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v0.9.18', notes: '밸런스 개편 — 자비 구간 2→1회로 축소(총알 저주가 실제 위협이 됨) · 확률의 눈 2단계 이동 · 콤보 마일스톤 상향(25/50/80)·별 등급 상향(40/80) · 광기의 축복/무지개 콤보 하향 · 검은 계약(2회 무효)·불멸의 탄창(3회, 저주 강화) 재조정' },
     { v: 'v0.9.17', notes: '최고 기록 저장(새로고침해도 유지) · 진행 중 재시작 방지 · 룰렛 다중 방아쇠/자비 곡선 버그 수정' },
     { v: 'v0.9.16', notes: '우상단에 버전 로그 추가 · 업데이트 알림을 우상단으로 이동' },
     { v: 'v0.9.15', notes: '새 버전 자동 감지 — 배포되면 알림 버튼이 뜨고 눌러서 바로 업데이트' },
