@@ -352,6 +352,7 @@
   }
   .shop-item .si-info { flex: 1; text-align: left; }
   .shop-item .si-name { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
+  .shop-item .si-stock { font-size: 11px; font-weight: 700; color: #ff9d73; margin-left: 4px; }
   .shop-item .si-desc { font-size: 13px; color: #aab; }
   .shop-item .si-cost { display: flex; gap: 4px; flex-shrink: 0; }
   .cost-chip {
@@ -1353,7 +1354,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v0.9.18</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.0.0</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -1712,17 +1713,17 @@
     {
       id: 'odds-eye',
       name: '확률의 눈',
-      tier: 2,
+      tier: 1,
       color: 'blue',
       good: '업/다운 성공 확률을 % 로 표시',
-      bad: '실패 시 총알이 1발 더 장전됨 (영구)',
-      apply(s) { s.hasOddsEye = true; s.bulletCurses += 1; },
+      bad: '없음',
+      apply(s) { s.hasOddsEye = true; },
     },
     {
       id: 'combo-guard',
       name: '기록 보호',
       tier: 1,
-      color: 'yellow',
+      color: 'green',
       good: '실패해도 연속 성공 기록 유지 (1회)',
       bad: '없음',
       apply(s) { s.comboGuardCharges += 1; },
@@ -1754,8 +1755,8 @@
       tier: 2,
       color: 'yellow',
       good: '같은 색 연속 정답마다 추가 콤보 (2연속 +1, 3연속 +2...)',
-      bad: '실패 시 총알 +1발 (영구)',
-      apply(s) { s.hasResonance = true; s.bulletCurses += 1; },
+      bad: '획득 후 다음 실패 1회 총알 +1발 (1회성)',
+      apply(s) { s.hasResonance = true; s.pendingBulletBonus += 1; },
     },
     {
       id: 'perfect-memory',
@@ -1763,8 +1764,8 @@
       tier: 2,
       color: 'blue',
       good: '남은 모든 카드의 수량 표시',
-      bad: '실패 시 총알이 1발 더 장전됨 (영구)',
-      apply(s) { s.hasPerfectMemory = true; s.bulletCurses += 1; },
+      bad: '실패 시 방아쇠를 2회 당김',
+      apply(s) { s.hasPerfectMemory = true; s.perfectMemoryExtraPull = true; },
     },
     {
       id: 'blurry-prophecy',
@@ -1800,9 +1801,9 @@
       name: '독심술',
       tier: 2,
       color: 'blue',
-      good: '동점(같은 숫자)도 정답 처리',
-      bad: '실패 시 총알이 1발 더 장전됨 (영구)',
-      apply(s) { s.tieIsWin = true; s.bulletCurses += 1; },
+      good: '동점(같은 숫자)도 정답 처리 + 동점 정답 시 콤보 +3',
+      bad: '획득 후 다음 실패 1회 총알 +1발 (1회성)',
+      apply(s) { s.tieIsWin = true; s.pendingBulletBonus += 1; },
     },
     {
       id: 'phoenix-feather',
@@ -1830,10 +1831,10 @@
       tier: 3,
       color: 'red',
       good: '다음 죽음 2회 무효',
-      bad: '그다음 실패는 즉사',
+      bad: '그다음 실패는 즉사 (방패·면역·부활로 막을 수 없음)',
       apply(s) {
         s.forcedBlocks.push({ type: 'survive', count: 2, afterEffect: null, source: '검은 계약' });
-        s.forcedBlocks.push({ type: 'death', count: 1, afterEffect: null, source: '검은 계약' });
+        s.forcedBlocks.push({ type: 'death', count: 1, afterEffect: null, source: '검은 계약', unblockable: true });
       },
     },
     {
@@ -1862,7 +1863,7 @@
       tier: 3,
       color: 'red',
       good: '정답마다 연속 성공 +2',
-      bad: '정답 6번마다 강제 룰렛 발동',
+      bad: '정답 6번마다 강제 룰렛 발동 (자비 없이 실확률로 발사)',
       apply(s) { s.streakBonus += 1; s.forcedRouletteEvery = 6; },
     },
   ];
@@ -1993,11 +1994,17 @@
       hasRedContract: false,
       hasResonance: false,
       hasRainbow: false,
+      perfectMemoryExtraPull: false, // 완벽한 기억 저주: 실패 시 방아쇠 2회
       // ---- 증강 색상 세트 ----
       setActivated: { red: false, blue: false, green: false, yellow: false },
       deathImmunityCharges: 0,   // 혈맹 세트: 죽음(즉사 포함) 완전 면역
       milestonesClaimed: [false, false, false], // 콤보 마일스톤 달성 여부
       bulletRemovals: 0,         // 총알 제거권: 다음 룰렛에서 총알 -1발
+      // ---- 상점 ----
+      heatCharges: 0,            // 🔥 열기: 남은 정답 콤보 2배 횟수
+      shopPurchases: {},         // 아이템별 구매 횟수 (가격 상승제)
+      shopStock: {},             // 판당 재고 소비 기록
+      shopUnlocked: false,       // 총 자원 6개 이상 모이면 개방
     };
   }
   let augmentState = createInitialAugmentState();
@@ -2382,10 +2389,13 @@
       }
     });
     if (s.deathImmunityCharges > 0) {
-      items.push({ cls: 'buff', text: `🔴 죽음 면역 ${s.deathImmunityCharges}회 (즉사 포함)`, tip: '어떤 죽음이든(검은 계약의 즉사 포함) 1회 완전히 무효화합니다. 불사조보다 나중에, 최후의 보루로 발동합니다.' });
+      items.push({ cls: 'buff', text: `🔴 죽음 면역 ${s.deathImmunityCharges}회`, tip: '죽음을 1회 무효화합니다. 단, 검은 계약의 즉사는 막을 수 없습니다. 불사조보다 나중에 최후의 보루로 발동합니다.' });
     }
     if (s.bulletRemovals > 0) {
       items.push({ cls: 'buff', text: `🧹 총알 제거권 ${s.bulletRemovals}회`, tip: '다음 룰렛에서 총알이 1발 제거됩니다. 총알이 0발이 되면 무조건 생존!' });
+    }
+    if (s.heatCharges > 0) {
+      items.push({ cls: 'buff', text: `🔥 열기 ${s.heatCharges}회`, tip: '다음 정답들의 콤보 획득이 2배가 됩니다. 정답마다 1회씩 소모됩니다.' });
     }
     // 다음 콤보 마일스톤 안내
     const nextMs = COMBO_MILESTONES.find((m, i) => !s.milestonesClaimed[i]);
@@ -2546,7 +2556,7 @@
       if (block.afterEffect === 'oneTimeThird') augmentState.pendingBulletBonus += 1;
       if (block.afterEffect === 'permanentBullet') augmentState.bulletCurses += 2;
     }
-    return { died: forcedDied, doubleVisual, source: block.source, remaining: block.count };
+    return { died: forcedDied, doubleVisual, source: block.source, remaining: block.count, unblockable: !!block.unblockable };
   }
 
   function shufflePick(arr, count) {
@@ -2558,7 +2568,7 @@
   // 총알이 있으면 사망. 화면에 보이는 총알 수 = 실제 확률이라 표시와
   // 결과가 어긋나는 버그가 원천적으로 없다.
   // forced(강제 생존/사망)는 착탄 챔버를 조건에 맞는 곳으로 고른다.
-  async function playRoulette(forced, failNum) {
+  async function playRoulette(forced, failNum, ignoreMercy = false) {
     rouletteBusy = true;
     spinFunBtn.disabled = true;
 
@@ -2590,7 +2600,9 @@
     if (forced) {
       died = forced.died;
     } else {
-      died = Math.random() < (bullets / TOTAL_CHAMBERS) * mercyMultiplier(failNum);
+      // 광기의 축복 등 강제 룰렛(ignoreMercy)은 자비 곡선을 무시하고 실확률로 발사
+      const mercy = ignoreMercy ? 1 : mercyMultiplier(failNum);
+      died = Math.random() < (bullets / TOTAL_CHAMBERS) * mercy;
     }
 
     // 장전 위치를 정하고, 결과에 맞는 챔버에 착탄시킨다.
@@ -2690,13 +2702,16 @@
   // countsForMercy=false(광기의 축복 등 강제 트리거)면 자비 카운터를 소비하지
   // 않는다 — 진짜 실수가 아닌데 자비 구간을 갉아먹으면 이후 실제 오답 때
   // 받아야 할 보호가 줄어들기 때문.
-  async function resolveRouletteEvent(countsForMercy = true) {
+  // countsForMercy=false + ignoreMercy=true → 광기의 축복 강제 룰렛.
+  // 자비 카운터를 소비하지 않고, 자비 곡선도 무시하고 실확률로 발사한다.
+  async function resolveRouletteEvent(countsForMercy = true, ignoreMercy = false) {
     if (countsForMercy) augmentState.failEvents++;
     const failNum = augmentState.failEvents;
     const forced = consumeForcedBlock();
     let pulls = 1;
     if (augmentState.hasProphecy) pulls++;
     if (augmentState.hasGamblersBlood) pulls++;
+    if (augmentState.perfectMemoryExtraPull) pulls++; // 완벽한 기억 저주
     pulls += augmentState.pendingExtraPulls; // 빨강 오답 등의 추가 방아쇠
     augmentState.pendingExtraPulls = 0;
     let died = false;
@@ -2705,9 +2720,14 @@
       // 피로 방아쇠가 늘어난 나머지 발은 진짜 확률로 굴러야 한다 — 안 그러면
       // 같은 강제 생존이 여러 발에 중복 적용돼 연출이 반복 재생되고
       // nearDeaths도 부풀려진다.
-      died = await playRoulette(i === 0 ? forced : null, failNum);
+      died = await playRoulette(i === 0 ? forced : null, failNum, ignoreMercy);
       if (died) break;
     }
+
+    // 검은 계약의 즉사(unblockable)는 부활·면역으로 막을 수 없다.
+    const unblockable = forced && forced.died && forced.unblockable;
+    if (unblockable) return died;
+
     died = await tryPhoenix(died);
 
     // 혈맹 세트: 죽음(즉사 포함) 완전 면역
@@ -3182,6 +3202,19 @@
         }
       }
 
+      // 독심술: 동점을 정답으로 처리했을 때 콤보 +3
+      if (isTie && augmentState.tieIsWin) {
+        gain += 3;
+        colorFloats.push(['🃏 독심술 — 동점 정답 +3', '#7bb7ff']);
+      }
+
+      // 🔥 열기(상점): 남은 횟수 동안 이번 정답 콤보 2배
+      if (augmentState.heatCharges > 0) {
+        gain *= 2;
+        augmentState.heatCharges--;
+        colorFloats.push([`🔥 열기 — 콤보 2배! (${augmentState.heatCharges}회 남음)`, '#ff7b4d']);
+      }
+
       streak += gain;
       augmentState.correctCount++;
       setBest(streak);
@@ -3283,7 +3316,7 @@
         augmentState.correctCount % augmentState.forcedRouletteEvery === 0
       ) {
         setMessage('🎲 광기의 축복 — 운명의 방아쇠를 당깁니다!', 'tie');
-        const died = await resolveRouletteEvent(false);
+        const died = await resolveRouletteEvent(false, true);
         renderOwnedAugments();
         if (died) {
           setMessage('💥 광기의 대가로 사망했습니다. 게임 오버.', 'lose');
@@ -3316,14 +3349,20 @@
   // ---------------------------------------------------------------------
   // 상점: 색 자원을 소비해 아이템을 구매한다
   // ---------------------------------------------------------------------
+  // 상점 아이템. stock: 판당 재고(없으면 무제한). base: 기본 비용.
+  // 같은 아이템을 살 때마다 가격이 +1(색 하나)씩 오른다(§6).
   const SHOP_ITEMS = [
-    { id: 'peek', name: '🔍 카드 투시 +1', desc: '다음 카드를 미리 확인 (1회)', cost: { blue: 2 }, buy(s) { s.hasCardPeek = true; s.peekCharges += 1; } },
-    { id: 'shield', name: '🛡 룰렛 방패 +1', desc: '실패 1회를 룰렛 없이 넘김', cost: { green: 2 }, buy(s) { s.shieldCharges += 1; } },
-    { id: 'reroll', name: '🔄 리롤 +1', desc: '증강 선택 시 카드 교체 1회', cost: { yellow: 2 }, buy(s) { s.rerollCharges += 1; } },
-    { id: 'combo', name: '🔥 콤보 +5', desc: '즉시 콤보 +5 (마일스톤 진행)', cost: { red: 2 }, buy() { /* streak는 구매 처리에서 별도 반영 */ } },
-    { id: 'remove', name: '🧹 총알 제거권 +1', desc: '다음 룰렛에서 총알 -1발', cost: { blue: 1, green: 1 }, buy(s) { s.bulletRemovals += 1; } },
-    { id: 'immunity', name: '💠 죽음 면역 +1', desc: '어떤 죽음이든 1회 무효 (즉사 포함)', cost: { red: 1, blue: 1, green: 1, yellow: 1 }, buy(s) { s.deathImmunityCharges += 1; } },
+    { id: 'peek', name: '🔍 카드 투시 +1', desc: '다음 카드를 미리 확인 (1회)', base: { blue: 2 }, buy(s) { s.hasCardPeek = true; s.peekCharges += 1; } },
+    { id: 'shield', name: '🛡 룰렛 방패 +1', desc: '실패 1회를 룰렛 없이 넘김', base: { green: 2 }, buy(s) { s.shieldCharges += 1; } },
+    { id: 'reroll', name: '🔄 리롤 +1', desc: '증강 선택 시 카드 교체 1회', base: { yellow: 2 }, buy(s) { s.rerollCharges += 1; } },
+    { id: 'heat', name: '🔥 열기', desc: '다음 정답 3회 콤보 2배', base: { red: 2 }, buy(s) { s.heatCharges += 3; } },
+    { id: 'remove', name: '🧹 총알 제거권 +1', desc: '다음 룰렛에서 총알 -1발', base: { blue: 1, green: 1 }, buy(s) { s.bulletRemovals += 1; } },
+    { id: 'cleanse', name: '🧪 정화', desc: '영구 총알 저주 1개 제거', base: { red: 1, blue: 1, green: 1, yellow: 1 }, stock: 2, buy(s) { s.bulletCurses = Math.max(0, s.bulletCurses - 1); } },
+    { id: 'immunity', name: '💠 죽음 면역 +1', desc: '어떤 죽음이든 1회 무효 (검은 계약 즉사 제외)', base: { red: 1, blue: 1, green: 1, yellow: 1 }, stock: 1, buy(s) { s.deathImmunityCharges += 1; } },
   ];
+
+  // 상점 개방: 총 자원 6개 이상 모이면 열린다(§6 — 첫 판 정보 과부하 방지)
+  const SHOP_OPEN_THRESHOLD = 6;
 
   const shopOverlay = document.getElementById('shopOverlay');
   const shopResources = document.getElementById('shopResources');
@@ -3332,8 +3371,32 @@
   const shopCloseBtn = document.getElementById('shopCloseBtn');
   const resourceBar = document.getElementById('resourceBar');
 
+  function totalResources() {
+    return Object.values(augmentState.resources).reduce((a, b) => a + b, 0);
+  }
+  function shopUnlocked() {
+    return augmentState.shopUnlocked || totalResources() >= SHOP_OPEN_THRESHOLD;
+  }
+
+  // 현재 비용 = 기본 비용 + 구매 횟수(같은 아이템 살수록 첫 색이 +1씩)
+  function itemCost(item) {
+    const bought = augmentState.shopPurchases[item.id] || 0;
+    const cost = { ...item.base };
+    if (bought > 0) {
+      const firstColor = Object.keys(cost)[0];
+      cost[firstColor] += bought;
+    }
+    return cost;
+  }
+  function itemStockLeft(item) {
+    if (item.stock === undefined) return Infinity;
+    return item.stock - (augmentState.shopStock[item.id] || 0);
+  }
   function canAfford(cost) {
     return Object.entries(cost).every(([c, n]) => augmentState.resources[c] >= n);
+  }
+  function canBuy(item) {
+    return itemStockLeft(item) > 0 && canAfford(itemCost(item));
   }
 
   function renderResourceBar() {
@@ -3344,8 +3407,10 @@
       pill.textContent = `${RESOURCE_ICON[c]} ${augmentState.resources[c]}`;
       resourceBar.appendChild(pill);
     });
-    // 살 수 있는 아이템이 있으면 상점 버튼 강조
-    shopBtn.classList.toggle('affordable', SHOP_ITEMS.some((it) => canAfford(it.cost)));
+    if (augmentState.shopUnlocked !== true && shopUnlocked()) augmentState.shopUnlocked = true;
+    const unlocked = augmentState.shopUnlocked === true;
+    shopBtn.style.display = unlocked ? '' : 'none';
+    shopBtn.classList.toggle('affordable', unlocked && SHOP_ITEMS.some((it) => canBuy(it)));
   }
 
   function renderShop() {
@@ -3358,18 +3423,23 @@
     });
     shopItems.innerHTML = '';
     SHOP_ITEMS.forEach((item) => {
+      const cost = itemCost(item);
+      const stockLeft = itemStockLeft(item);
+      const soldOut = stockLeft <= 0;
       const row = document.createElement('div');
       row.className = 'shop-item';
-      const costHtml = Object.entries(item.cost)
+      const costHtml = Object.entries(cost)
         .map(([c, n]) => `<span class="cost-chip r-${c} ${augmentState.resources[c] >= n ? '' : 'lack'}">${RESOURCE_ICON[c]}×${n}</span>`)
         .join('');
+      const stockTag = item.stock !== undefined
+        ? `<span class="si-stock">재고 ${Math.max(0, stockLeft)}/${item.stock}</span>` : '';
       row.innerHTML = `
         <div class="si-info">
-          <div class="si-name">${item.name}</div>
+          <div class="si-name">${item.name} ${stockTag}</div>
           <div class="si-desc">${item.desc}</div>
         </div>
         <div class="si-cost">${costHtml}</div>
-        <button type="button" class="si-buy" ${canAfford(item.cost) ? '' : 'disabled'}>구매</button>
+        <button type="button" class="si-buy" ${canBuy(item) ? '' : 'disabled'}>${soldOut ? '품절' : '구매'}</button>
       `;
       row.querySelector('.si-buy').addEventListener('click', () => buyItem(item));
       shopItems.appendChild(row);
@@ -3377,24 +3447,14 @@
   }
 
   function buyItem(item) {
-    if (!canAfford(item.cost)) return;
-    Object.entries(item.cost).forEach(([c, n]) => { augmentState.resources[c] -= n; });
-    item.buy(augmentState);
-    // 콤보 부스트는 전역 streak를 직접 올린다 (마일스톤 판정 포함)
-    if (item.id === 'combo') {
-      streak += 5;
-      setBest(streak);
-      if (streak > runBest) runBest = streak;
-      const floats = [];
-      COMBO_MILESTONES.forEach((m, i) => {
-        if (augmentState.milestonesClaimed[i] || streak < m.at) return;
-        augmentState.milestonesClaimed[i] = true;
-        m.grant(augmentState);
-        floats.push([`🏁 콤보 ${m.at} 달성! ${m.text}`, '#ffd166']);
-      });
-      floats.forEach((f, i) => setTimeout(() => fx.float(window.innerWidth / 2, window.innerHeight / 2 - 120 - i * 10, f[0], f[1], 22), i * 250));
-      popCombo();
+    if (!canBuy(item)) return;
+    const cost = itemCost(item);
+    Object.entries(cost).forEach(([c, n]) => { augmentState.resources[c] -= n; });
+    augmentState.shopPurchases[item.id] = (augmentState.shopPurchases[item.id] || 0) + 1;
+    if (item.stock !== undefined) {
+      augmentState.shopStock[item.id] = (augmentState.shopStock[item.id] || 0) + 1;
     }
+    item.buy(augmentState);
     sfx('pick');
     fx.float(window.innerWidth / 2, window.innerHeight / 2 - 80, `${item.name} 구매!`, '#ffd166', 24);
     renderShop();
@@ -3422,7 +3482,7 @@
     colorTitle.textContent = '🎨 카드 색상 효과 (기본 규칙)';
     codexBody.appendChild(colorTitle);
     [
-      ['🔴 빨강', '정답 시 🔴 자원 +1 — 콤보 부스트 구매에 사용'],
+      ['🔴 빨강', '정답 시 🔴 자원 +1 — 열기 구매에 사용'],
       ['🟡 노랑', '정답 시 🟡 자원 +1 — 리롤 구매에 사용'],
       ['🔵 파랑', '정답 시 🔵 자원 +1 — 카드 투시 구매에 사용'],
       ['🟢 초록', '정답 시 🟢 자원 +1 — 룰렛 방패 구매에 사용'],
@@ -3452,13 +3512,14 @@
     // 상점 안내
     const shopTitle = document.createElement('div');
     shopTitle.className = 'codex-tier-title t2';
-    shopTitle.textContent = '🛒 상점 (색 자원으로 구매)';
+    shopTitle.textContent = '🛒 상점 (자원 6개 이상 모이면 개방 · 살수록 가격 +1)';
     codexBody.appendChild(shopTitle);
     SHOP_ITEMS.forEach((item) => {
-      const costText = Object.entries(item.cost).map(([c, n]) => `${RESOURCE_ICON[c]}×${n}`).join(' ');
+      const costText = Object.entries(item.base).map(([c, n]) => `${RESOURCE_ICON[c]}×${n}`).join(' ');
+      const stockText = item.stock !== undefined ? ` · 재고 ${item.stock}` : '';
       const row = document.createElement('div');
       row.className = 'codex-item';
-      row.innerHTML = `<span class="cx-name">${item.name}</span><span class="cx-desc">${item.desc} — <span class="good">${costText}</span></span>`;
+      row.innerHTML = `<span class="cx-name">${item.name}</span><span class="cx-desc">${item.desc} — <span class="good">${costText}${stockText}</span></span>`;
       codexBody.appendChild(row);
     });
 
@@ -3553,6 +3614,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.0.0', notes: '기획서 v1.0 P0+P1 반영 — 저주 예산제 재가격(확률의 눈 저주삭제·T1, 독심술/색채공명 1회성 총알, 완벽한 기억 방아쇠2회, 기록보호 초록) · 광기의 축복 강제 룰렛 자비 무시(×1) · 검은 계약 즉사 면역불가 · 상점 개편(죽음면역 재고1·정화 신설·열기 대체·구매마다 가격+1·자원6개 개방)' },
     { v: 'v0.9.18', notes: '밸런스 개편 — 자비 구간 2→1회로 축소(총알 저주가 실제 위협이 됨) · 확률의 눈 2단계 이동 · 콤보 마일스톤 상향(25/50/80)·별 등급 상향(40/80) · 광기의 축복/무지개 콤보 하향 · 검은 계약(2회 무효)·불멸의 탄창(3회, 저주 강화) 재조정' },
     { v: 'v0.9.17', notes: '최고 기록 저장(새로고침해도 유지) · 진행 중 재시작 방지 · 룰렛 다중 방아쇠/자비 곡선 버그 수정' },
     { v: 'v0.9.16', notes: '우상단에 버전 로그 추가 · 업데이트 알림을 우상단으로 이동' },
