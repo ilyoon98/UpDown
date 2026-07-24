@@ -1364,7 +1364,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.3.0</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.3.1</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -1389,6 +1389,7 @@
 
     <button type="button" class="card-peek-btn" id="cardPeekBtn">🔍 다음 카드 확인</button>
     <button type="button" class="card-peek-btn" id="futureStealBtn" style="background:linear-gradient(135deg,#7a2ea0,#b45cd4);">🕳 미래 절취</button>
+    <button type="button" class="card-peek-btn" id="oddsBtn" style="background:linear-gradient(135deg,#8a6a1f,#d4a017);">📊 확률 보기</button>
 
     <div class="message" id="message"></div>
 
@@ -1726,9 +1727,9 @@
       name: '확률의 눈',
       tier: 1,
       color: 'yellow',
-      good: '업/다운 성공 확률을 % 로 표시',
+      good: '원할 때 업/다운 성공 확률 확인 (총 5회)',
       bad: '없음',
-      apply(s) { s.hasOddsEye = true; },
+      apply(s) { s.hasOddsEye = true; s.oddsCharges += 5; },
     },
     {
       id: 'combo-guard',
@@ -1783,7 +1784,7 @@
       name: '흐릿한 예언',
       tier: 2,
       color: 'blue',
-      good: '다음 카드의 그룹(1~5 / 6~10) 표시',
+      good: '다음 카드의 대략적 구간(낮음/중간/높음) 표시 · 지혜 2단계에서 정밀해짐',
       bad: '실패 시 방아쇠를 2회 당김',
       apply(s) { s.hasProphecy = true; },
     },
@@ -2097,6 +2098,7 @@
       rainbowSet: new Set(),     // 무지개 축복: 수집한 색
       pendingExtraPulls: 0,      // 빨강 오답 등으로 이번 실패에 추가되는 방아쇠 수
       hasGoldenEye: false,
+      oddsCharges: 0,            // 확률의 눈: 남은 확인 횟수
       hasRedContract: false,
       hasResonance: false,
       hasRainbow: false,
@@ -2304,8 +2306,10 @@
   }
 
   // 확률의 눈: 업/다운 버튼에 성공 확률 % 표시
+  // 확률의 눈: 이번 턴에 '확률 보기'를 눌렀을 때만 % 표시 (충전형)
+  let oddsRevealed = false;
   function updateButtons() {
-    if (augmentState.hasOddsEye && currentCard && deck.length > 0) {
+    if (oddsRevealed && currentCard && deck.length > 0) {
       const higher = deck.filter((c) => c.number > currentCard.number).length;
       const lower = deck.filter((c) => c.number < currentCard.number).length;
       const upPct = Math.round((higher / deck.length) * 100);
@@ -2316,6 +2320,13 @@
       upBtn.textContent = '▲ 업 (높다)';
       downBtn.textContent = '▼ 다운 (낮다)';
     }
+  }
+
+  // 확률의 눈 버튼: 남은 충전이 있으면 이번 턴 확률을 공개 (충전 소모)
+  function refreshOddsUI() {
+    const show = augmentState.hasOddsEye && augmentState.oddsCharges > 0 && !oddsRevealed;
+    oddsBtn.textContent = `📊 확률 보기 (${augmentState.oddsCharges}회)`;
+    oddsBtn.classList.toggle('show', show);
   }
 
   function buildCardGrid() {
@@ -2386,14 +2397,15 @@
   function renderProphecyHint() {
     if (augmentState.hasProphecy && deck.length > 0) {
       const top = deck[deck.length - 1];
-      // 지혜 2단계: 3분할 예언 (1~3 / 4~7 / 8~10), 그 외는 2분할
+      // 기본 예언은 정보량이 낮은 3구간(넓고 모호). 지혜 2단계에서만
+      // 정확한 2분할(1~5 / 6~10)로 선명해진다.
       let group;
       if (setLevel('blue') >= 2) {
-        group = top.number <= 3 ? '1~3' : top.number <= 7 ? '4~7' : '8~10';
-      } else {
         group = top.number <= 5 ? '1~5' : '6~10';
+      } else {
+        group = top.number <= 4 ? '낮은 편(1~4)' : top.number <= 6 ? '중간(5~6)' : '높은 편(7~10)';
       }
-      prophecyHintEl.textContent = `🔮 다음 카드 예언: ${group} 그룹`;
+      prophecyHintEl.textContent = `🔮 다음 카드 예언: ${group}`;
       prophecyHintEl.style.display = 'block';
     } else {
       prophecyHintEl.style.display = 'none';
@@ -2434,6 +2446,17 @@
   });
 
   // 미래 절취: 다음 카드를 잠깐 보여주고 덱 맨 밑으로 보낸다 (판당 charges 소모)
+  const oddsBtn = document.getElementById('oddsBtn');
+  oddsBtn.addEventListener('click', () => {
+    if (oddsRevealed || augmentState.oddsCharges <= 0 || deck.length === 0) return;
+    augmentState.oddsCharges--;
+    oddsRevealed = true;
+    updateButtons();
+    refreshOddsUI();
+    renderOwnedAugments();
+    sfx('tie');
+  });
+
   const futureStealBtn = document.getElementById('futureStealBtn');
   futureStealBtn.addEventListener('click', () => {
     if (peekActive || augmentState.futureStealCharges <= 0 || deck.length === 0) return;
@@ -2493,6 +2516,8 @@
     const s = augmentState;
     switch (aug.id) {
       case 'card-peek': return s.peekCharges;
+      case 'odds-eye': return s.oddsCharges;
+      case 'future-steal': return s.futureStealCharges;
       case 'iron-heart': return s.shieldCharges;
       case 'combo-guard': return s.comboGuardCharges;
       case 'phoenix-feather': return s.phoenixCharges;
@@ -2612,6 +2637,7 @@
     renderProphecyHint();
     renderNextAugmentHint();
     refreshCardPeekUI();
+    refreshOddsUI();
     renderOwnedAugments();
   }
 
@@ -3395,6 +3421,7 @@
       fx.float(window.innerWidth / 2, 140, '⚗️ 연금술사 이자 — 전 색 +1', '#ffd166', 20);
     }
     peekActive = false; // 새 카드가 공개되므로 투시 상태 해제
+    oddsRevealed = false; // 확률 표시도 이번 턴 종료
     renderCard(nextCardEl, next);
     markUsed(next);
 
@@ -3959,6 +3986,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.3.1', notes: '밸런스 — 확률의 눈 너프(상시 % → 충전형 5회 확인 버튼) · 흐릿한 예언 너프(정확한 1~5/6~10 → 모호한 3구간, 지혜 2단계에서만 정밀)' },
     { v: 'v1.3.0', notes: '기획서 P4 — 딜러의 최후(마지막 6장: 총알+1·콤보2배·붉은 톤다운 연출) · 첫 시도 오프닝(첫 증강 고정 3택: 강철 심장/카드 투시/도박사의 피) · 상점 중반 개방(P1에 반영됨)' },
     { v: 'v1.2.0', notes: '기획서 P3 — 신규 증강 8종 추가(보험 계약·중용의 길·미래 절취·전율 중독·곡예사·역배당·오뚝이·연금술사). 총 28종, 색 7·7·7·7 균형. 미래 절취 버튼·오뚝이 콤보2배 등 신규 UI 반영' },
     { v: 'v1.1.0', notes: '기획서 P2 — 세트 시스템 지속형 개편(같은 색 2개→1단계 / 4개→2단계 학파 효과) · 카드 색 연결(혈맹 빨강+1 / 지혜 파랑 게이지 / 생명 초록 게이지 / 황금 노랑 자원) · 지혜2 예언 3분할·생명2 자동무효·혈맹2 룰렛생존 콤보+10·황금2 상점할인' },
