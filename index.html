@@ -58,6 +58,16 @@
   }
   body.shake-soft { animation: softShake 0.3s ease; }
 
+  /* 딜러의 최후: 마지막 6장 구간 — 톤 다운 붉은 분위기 */
+  body.finale {
+    background:
+      radial-gradient(ellipse at top, #3a1518 0%, #1e1e2e 55%),
+      var(--bg);
+    transition: background 1.2s ease;
+  }
+  body.finale h1 { color: #ff8a8a; }
+  body.finale .card { box-shadow: 0 8px 28px rgba(180, 30, 40, 0.5); }
+
   .layout {
     display: flex;
     gap: 40px;
@@ -1354,7 +1364,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.2.0</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.3.0</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -2155,6 +2165,19 @@
   const resultRestartBtn = document.getElementById('resultRestartBtn');
   const resultCloseBtn = document.getElementById('resultCloseBtn');
   let runBest = 0; // 이번 판 최고 콤보
+
+  // 첫 플레이 여부 (첫 증강 큐레이션용). 이 브라우저에서 한 번이라도
+  // 게임을 끝냈으면 false — 재도전부터는 증강 풀이 완전 랜덤이 된다.
+  let isFirstRun = false;
+  try { isFirstRun = !localStorage.getItem('updown_played'); } catch (e) { isFirstRun = true; }
+  function markPlayed() {
+    isFirstRun = false;
+    try { localStorage.setItem('updown_played', '1'); } catch (e) { /* 무시 */ }
+  }
+
+  // 딜러의 최후: 마지막 6장(진행 34~39). 총알 +1, 콤보 2배, 톤 다운 연출.
+  const FINALE_START = 34;
+  function isFinale() { return augmentState.cardsAdvanced >= FINALE_START; }
   const peekBtn = document.getElementById('peekBtn');
   const deckProgressEl = document.getElementById('deckProgress');
   const nextAugPill = document.getElementById('nextAugPill');
@@ -2740,6 +2763,8 @@
       bullets += augmentState.pendingBulletBonus;
       augmentState.pendingBulletBonus = 0;
     }
+    // 딜러의 최후: 마지막 6장 구간은 총알 +1 (강제 결과 제외)
+    if (!forced && isFinale()) bullets += 1;
     bullets = Math.min(bullets, TOTAL_CHAMBERS - 1); // 최소 1칸은 비워둔다
 
     // 총알 제거권 (콤보 30 마일스톤): 이번 룰렛에서 총알 제거
@@ -3226,7 +3251,15 @@
       augmentState.triggeredThresholds.add(threshold);
 
       const stageIndex = AUGMENT_THRESHOLDS.indexOf(threshold);
-      const options = pickAugmentOptions(stageIndex);
+      // 첫 시도 오프닝: 첫 증강만 고정 3택(방어/정보/공격)으로 성향 진단.
+      // 재도전부터는 풀 랜덤.
+      let options;
+      if (isFirstRun && stageIndex === 0) {
+        const CURATED = ['iron-heart', 'card-peek', 'gamblers-blood'];
+        options = CURATED.map((id) => AUGMENTS.find((a) => a.id === id)).filter(Boolean);
+      } else {
+        options = pickAugmentOptions(stageIndex);
+      }
       if (options.length === 0) continue;
 
       await runAugmentPick(stageIndex, options);
@@ -3256,6 +3289,7 @@
     resetCardGrid();
     buildDeckMarkers();
     markUsed(currentCard);
+    document.body.classList.remove('finale');
     cylinderRotation = 0;
     chambersGroup.style.transition = 'none';
     chambersGroup.style.transform = 'rotate(0deg)';
@@ -3317,6 +3351,7 @@
 
   function endGame(win, cause) {
     setChoiceButtons(false);
+    markPlayed(); // 한 판을 끝냈으니 이후로는 첫 증강 큐레이션 해제
     restartBtn.classList.add('attention');
     if (win) {
       setMessage(`카드를 모두 소진했습니다! 최종 연속 성공: ${streak}`, 'win');
@@ -3346,6 +3381,14 @@
     const prevStreak = streak;
     const next = deck.pop();
     augmentState.cardsAdvanced++;
+    // 딜러의 최후 진입 연출 (정확히 34장째 도달 순간 1회)
+    if (augmentState.cardsAdvanced === FINALE_START) {
+      document.body.classList.add('finale');
+      fx.flash('rgba(180, 30, 40, 0.4)', 700);
+      fx.shake(true);
+      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 60, '🎭 마지막 6장 — 딜러가 웃고 있다', '#ff5c5c', 30);
+      sfx('death');
+    }
     // 연금술사: 10장 진행마다 전 색 자원 +1 (이자)
     if (augmentState.hasAlchemist && augmentState.cardsAdvanced % 10 === 0) {
       ['red', 'blue', 'green', 'yellow'].forEach((c) => { augmentState.resources[c] += 1; });
@@ -3494,6 +3537,12 @@
         gain *= 2;
         augmentState.heatCharges--;
         colorFloats.push([`🔥 열기 — 콤보 2배! (${augmentState.heatCharges}회 남음)`, '#ff7b4d']);
+      }
+
+      // 딜러의 최후: 마지막 6장 구간 정답 콤보 2배
+      if (isFinale() && gain > 0) {
+        gain *= 2;
+        colorFloats.push(['🎭 딜러의 최후 — 콤보 2배!', '#ff5c5c']);
       }
 
       streak += gain;
@@ -3910,6 +3959,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.3.0', notes: '기획서 P4 — 딜러의 최후(마지막 6장: 총알+1·콤보2배·붉은 톤다운 연출) · 첫 시도 오프닝(첫 증강 고정 3택: 강철 심장/카드 투시/도박사의 피) · 상점 중반 개방(P1에 반영됨)' },
     { v: 'v1.2.0', notes: '기획서 P3 — 신규 증강 8종 추가(보험 계약·중용의 길·미래 절취·전율 중독·곡예사·역배당·오뚝이·연금술사). 총 28종, 색 7·7·7·7 균형. 미래 절취 버튼·오뚝이 콤보2배 등 신규 UI 반영' },
     { v: 'v1.1.0', notes: '기획서 P2 — 세트 시스템 지속형 개편(같은 색 2개→1단계 / 4개→2단계 학파 효과) · 카드 색 연결(혈맹 빨강+1 / 지혜 파랑 게이지 / 생명 초록 게이지 / 황금 노랑 자원) · 지혜2 예언 3분할·생명2 자동무효·혈맹2 룰렛생존 콤보+10·황금2 상점할인' },
     { v: 'v1.0.0', notes: '기획서 v1.0 P0+P1 반영 — 저주 예산제 재가격(확률의 눈 저주삭제·T1, 독심술/색채공명 1회성 총알, 완벽한 기억 방아쇠2회, 기록보호 초록) · 광기의 축복 강제 룰렛 자비 무시(×1) · 검은 계약 즉사 면역불가 · 상점 개편(죽음면역 재고1·정화 신설·열기 대체·구매마다 가격+1·자원6개 개방)' },
