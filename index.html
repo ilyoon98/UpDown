@@ -1354,7 +1354,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.0.0</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.1.0</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -1869,30 +1869,44 @@
   ];
 
   // ---------------------------------------------------------------------
-  // 증강 색상 세트: 같은 색 증강을 2개 모으면 세트 보너스가 발동한다 (1회성)
+  // 증강 색상 세트(학파): 같은 색 증강 2개 → 1단계, 4개 → 2단계 지속 효과.
+  // 색 = 학파: 🔵정보 · 🟢방어 · 🔴리스크 · 🟡경제
   // ---------------------------------------------------------------------
   const COLOR_SETS = {
     red: {
-      icon: '🔴', name: '혈맹', need: 2,
-      bonusText: '죽음 1회 완전 면역 (즉사 포함)',
-      grant(s) { s.deathImmunityCharges += 1; },
+      icon: '🔴', name: '혈맹', school: '리스크',
+      t1: '콤보 보너스 발동 시 +1 · 빨강 카드 정답 시 콤보 +1',
+      t2: '룰렛 생존 시 콤보 +10',
     },
     blue: {
-      icon: '🔵', name: '지혜', need: 2,
-      bonusText: '카드 투시 +2회',
-      grant(s) { s.hasCardPeek = true; s.peekCharges += 2; },
+      icon: '🔵', name: '지혜', school: '정보',
+      t1: '투시 사용 시 40% 확률로 미소모 · 파랑 카드 정답 시 투시 게이지 +20%(5회→투시+1)',
+      t2: '예언이 3분할로 표시 + 매 10장마다 투시 +1',
     },
     green: {
-      icon: '🟢', name: '생명', need: 2,
-      bonusText: '룰렛 방패 +1회',
-      grant(s) { s.shieldCharges += 1; },
+      icon: '🟢', name: '생명', school: '방어',
+      t1: '보호류 획득 시 50% 확률로 +1 · 초록 카드 정답 시 방패 게이지 +25%(4회→방패+1)',
+      t2: '판당 1회 사망 자동 무효',
     },
     yellow: {
-      icon: '🟡', name: '황금', need: 2,
-      bonusText: '리롤 +2회',
-      grant(s) { s.rerollCharges += 2; },
+      icon: '🟡', name: '황금', school: '경제',
+      t1: '자원 획득 시 25% 확률로 +1 · 노랑 카드 정답 시 자원 +1',
+      t2: '상점 전 품목 −1 + 증강 선택 화면마다 자원 +2',
     },
   };
+
+  // 세트 레벨: 같은 색 증강 4개 → 2, 2개 → 1, 그 외 0
+  function setLevel(color) {
+    const n = ownedColorCount(color);
+    return n >= 4 ? 2 : n >= 2 ? 1 : 0;
+  }
+  function setBonusText(color) {
+    const s = COLOR_SETS[color];
+    const lv = setLevel(color);
+    if (lv >= 2) return `2단계: ${s.t2}`;
+    if (lv >= 1) return `1단계: ${s.t1}`;
+    return `2개→1단계 / 4개→2단계`;
+  }
 
   // ---------------------------------------------------------------------
   // 콤보 마일스톤: 콤보가 목표치에 도달하면 생존 보상으로 환급된다 (판당 1회씩)
@@ -1911,14 +1925,16 @@
     }).length;
   }
 
-  // 증강 획득 후 호출: 새로 완성된 색 세트가 있으면 발동시킨다
+  // 증강 획득 후 호출: 세트 레벨이 오르면 축하 연출.
+  // (지속형이라 별도 grant는 없고, 효과는 각 발동 지점에서 setLevel로 판정한다)
   function checkColorSets() {
     Object.entries(COLOR_SETS).forEach(([color, set]) => {
-      if (augmentState.setActivated[color]) return;
-      if (ownedColorCount(color) < set.need) return;
-      augmentState.setActivated[color] = true;
-      set.grant(augmentState);
-      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 140, `${set.icon} ${set.name} 세트 발동! ${set.bonusText}`, '#ffd166', 28);
+      const lv = setLevel(color);
+      const prev = augmentState.setLevelShown[color] || 0;
+      if (lv <= prev) return;
+      augmentState.setLevelShown[color] = lv;
+      const desc = lv >= 2 ? set.t2 : set.t1;
+      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 140, `${set.icon} ${set.name} ${lv}단계! ${desc}`, '#ffd166', 26);
       fx.confetti(40);
       fx.flash('rgba(255, 209, 102, 0.25)', 500);
       sfx('legendary');
@@ -1995,9 +2011,12 @@
       hasResonance: false,
       hasRainbow: false,
       perfectMemoryExtraPull: false, // 완벽한 기억 저주: 실패 시 방아쇠 2회
-      // ---- 증강 색상 세트 ----
-      setActivated: { red: false, blue: false, green: false, yellow: false },
-      deathImmunityCharges: 0,   // 혈맹 세트: 죽음(즉사 포함) 완전 면역
+      // ---- 증강 색상 세트(학파) ----
+      setLevelShown: { red: 0, blue: 0, green: 0, yellow: 0 }, // 축하 연출용 최근 표시 레벨
+      blueGauge: 0,              // 지혜 1단계: 파랑 카드 정답 게이지 (5 → 투시 +1)
+      greenGauge: 0,            // 생명 1단계: 초록 카드 정답 게이지 (4 → 방패 +1)
+      autoReviveUsed: false,    // 생명 2단계: 판당 1회 사망 자동 무효 사용 여부
+      deathImmunityCharges: 0,   // 죽음 면역 (상점/마일스톤)
       milestonesClaimed: [false, false, false], // 콤보 마일스톤 달성 여부
       bulletRemovals: 0,         // 총알 제거권: 다음 룰렛에서 총알 -1발
       // ---- 상점 ----
@@ -2138,8 +2157,11 @@
   const RESOURCE_ICON = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡' };
   const RESOURCE_FX = { red: '#ff7b7b', blue: '#7bb7ff', green: '#5fd8c4', yellow: '#ffd166' };
   function addResource(color, amount, floats) {
-    augmentState.resources[color] += amount;
-    floats.push([`${RESOURCE_ICON[color]} 자원 +${amount}`, RESOURCE_FX[color]]);
+    // 황금 1단계: 자원 획득 시 25% 확률로 +1
+    let bonus = 0;
+    if (setLevel('yellow') >= 1 && Math.random() < 0.25) bonus = 1;
+    augmentState.resources[color] += amount + bonus;
+    floats.push([`${RESOURCE_ICON[color]} 자원 +${amount + bonus}${bonus ? ' 💰' : ''}`, RESOURCE_FX[color]]);
   }
 
   // 콤보 배지 팝 애니메이션 재생
@@ -2251,8 +2273,14 @@
   function renderProphecyHint() {
     if (augmentState.hasProphecy && deck.length > 0) {
       const top = deck[deck.length - 1];
-      const half = top.number <= 5 ? '1~5' : '6~10';
-      prophecyHintEl.textContent = `🔮 다음 카드 예언: ${half} 그룹`;
+      // 지혜 2단계: 3분할 예언 (1~3 / 4~7 / 8~10), 그 외는 2분할
+      let group;
+      if (setLevel('blue') >= 2) {
+        group = top.number <= 3 ? '1~3' : top.number <= 7 ? '4~7' : '8~10';
+      } else {
+        group = top.number <= 5 ? '1~5' : '6~10';
+      }
+      prophecyHintEl.textContent = `🔮 다음 카드 예언: ${group} 그룹`;
       prophecyHintEl.style.display = 'block';
     } else {
       prophecyHintEl.style.display = 'none';
@@ -2270,7 +2298,13 @@
 
   cardPeekBtn.addEventListener('click', () => {
     if (peekActive || deck.length === 0 || augmentState.peekCharges <= 0) return;
-    augmentState.peekCharges--;
+    // 지혜 1단계: 40% 확률로 투시 미소모
+    if (!(setLevel('blue') >= 1 && Math.random() < 0.4)) {
+      augmentState.peekCharges--;
+    } else {
+      const cc = fx.centerOf(cardPeekBtn);
+      fx.float(cc.x, cc.y, '📘 지혜 — 투시 미소모!', '#7bb7ff', 16);
+    }
     peekActive = true;
     const top = deck[deck.length - 1];
     renderCard(nextCardEl, top);
@@ -2379,15 +2413,20 @@
     if (s.hasRainbow) {
       items.push({ cls: 'neutral', text: `🌈 무지개 수집: ${s.rainbowSet.size}/4`, tip: '4가지 색을 모두 정답으로 모으면 콤보 +10과 리롤 +1을 얻고 수집이 처음부터 다시 시작됩니다.' });
     }
-    // 증강 색상 세트 진행도
+    // 증강 색상 세트(학파) 진행도
     Object.entries(COLOR_SETS).forEach(([color, set]) => {
       const n = ownedColorCount(color);
-      if (s.setActivated[color]) {
-        items.push({ cls: 'buff', text: `${set.icon} ${set.name} 세트 발동됨`, tip: `세트 보너스가 적용되었습니다: ${set.bonusText}` });
-      } else if (n > 0) {
-        items.push({ cls: 'neutral', text: `${set.icon} ${set.name} 세트 ${n}/${set.need}`, tip: `${set.name} 색 증강을 ${set.need}개 모으면 발동: ${set.bonusText}` });
+      if (n === 0) return;
+      const lv = setLevel(color);
+      if (lv >= 1) {
+        items.push({ cls: 'buff', text: `${set.icon} ${set.name} ${lv}단계 (${n})`, tip: setBonusText(color) });
+      } else {
+        items.push({ cls: 'neutral', text: `${set.icon} ${set.name} ${n}/2`, tip: `${set.name}(${set.school}) 증강 2개 → 1단계: ${set.t1}` });
       }
     });
+    // 지혜/생명 카드 게이지 (1단계 이상일 때만)
+    if (setLevel('blue') >= 1) items.push({ cls: 'neutral', text: `🔵 지혜 게이지 ${s.blueGauge}/5`, tip: '파랑 카드 정답이 5회 쌓이면 카드 투시 +1.' });
+    if (setLevel('green') >= 1) items.push({ cls: 'neutral', text: `🟢 생명 게이지 ${s.greenGauge}/4`, tip: '초록 카드 정답이 4회 쌓이면 룰렛 방패 +1.' });
     if (s.deathImmunityCharges > 0) {
       items.push({ cls: 'buff', text: `🔴 죽음 면역 ${s.deathImmunityCharges}회`, tip: '죽음을 1회 무효화합니다. 단, 검은 계약의 즉사는 막을 수 없습니다. 불사조보다 나중에 최후의 보루로 발동합니다.' });
     }
@@ -2730,11 +2769,11 @@
 
     died = await tryPhoenix(died);
 
-    // 혈맹 세트: 죽음(즉사 포함) 완전 면역
+    // 죽음 면역 (상점/마일스톤)
     if (died && augmentState.deathImmunityCharges > 0) {
       augmentState.deathImmunityCharges--;
       augmentState.nearDeaths++;
-      rouletteResult.textContent = '🔴 혈맹의 가호 — 죽음 면역!';
+      rouletteResult.textContent = '💠 죽음 면역 발동!';
       rouletteResult.className = 'roulette-result revive';
       const c = fx.centerOf(roulettePanel);
       fx.burst(c.x, c.y, { count: 46, colors: ['#e63946', '#ffd166', '#fff'], spread: 200, size: 10 });
@@ -2743,6 +2782,30 @@
       await new Promise((r) => setTimeout(r, 1100));
       died = false;
       renderOwnedAugments();
+    }
+
+    // 생명 2단계: 판당 1회 사망 자동 무효
+    if (died && setLevel('green') >= 2 && !augmentState.autoReviveUsed) {
+      augmentState.autoReviveUsed = true;
+      augmentState.nearDeaths++;
+      rouletteResult.textContent = '🟢 생명의 가호 — 자동 무효! (판당 1회)';
+      rouletteResult.className = 'roulette-result revive';
+      const c = fx.centerOf(roulettePanel);
+      fx.burst(c.x, c.y, { count: 46, colors: ['#2a9d8f', '#5fd8c4', '#fff'], spread: 200, size: 10 });
+      fx.flash('rgba(42, 157, 143, 0.3)', 600);
+      sfx('revive');
+      await new Promise((r) => setTimeout(r, 1100));
+      died = false;
+    }
+
+    // 혈맹 2단계: 룰렛에서 살아남으면 콤보 +10
+    if (!died && setLevel('red') >= 2) {
+      streak += 10;
+      setBest(streak);
+      if (streak > runBest) runBest = streak;
+      updateStats();
+      const c = fx.centerOf(roulettePanel);
+      fx.float(c.x, c.y - 40, '🔴 혈맹 — 생존 콤보 +10!', '#ff7b7b', 20);
     }
     return died;
   }
@@ -2894,11 +2957,11 @@
           <div class="augment-tier">${TIER_LABEL[aug.tier]}</div>
           <div class="augment-color-tag ct-${aug.color}" data-tooltip="${(() => {
             const set = COLOR_SETS[aug.color];
-            const n = ownedColorCount(aug.color);
-            return augmentState.setActivated[aug.color]
-              ? `${set.name} 세트 발동됨 — ${set.bonusText} (이미 적용)`
-              : `${set.name} 색 증강을 ${set.need}개 모으면 발동: ${set.bonusText} (현재 ${n}/${set.need})`;
-          })()}">${COLOR_SETS[aug.color].icon} ${COLOR_SETS[aug.color].name} 세트 (${ownedColorCount(aug.color)}/${COLOR_SETS[aug.color].need})</div>
+            // 이 증강을 고르면 올라갈 개수 기준으로 다음 단계를 안내
+            const after = ownedColorCount(aug.color) + (augmentState.owned.includes(aug.id) ? 0 : 1);
+            const nextTier = after >= 4 ? `2단계: ${set.t2}` : after >= 2 ? `1단계: ${set.t1}` : `2개→1단계 / 4개→2단계`;
+            return `${set.name}(${set.school}) 학파 · 선택 시 ${after}개 · ${nextTier}`;
+          })()}">${COLOR_SETS[aug.color].icon} ${COLOR_SETS[aug.color].name} ${setLevel(aug.color) >= 1 ? setLevel(aug.color) + '단계' : ownedColorCount(aug.color) + '/2'}</div>
           <div class="augment-box blessing">
             <div class="box-label">축복</div>
             <div class="box-body">${aug.good}</div>
@@ -3001,6 +3064,12 @@
 
   // 증강 1개 선택을 진행하고 적용까지 마무리하는 헬퍼
   async function runAugmentPick(stageIndex, options) {
+    // 황금 2단계: 증강 선택 화면이 열릴 때마다 자원 +2 (색은 랜덤)
+    if (setLevel('yellow') >= 2) {
+      const colors = ['red', 'blue', 'green', 'yellow'];
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      augmentState.resources[c] += 2;
+    }
     const chosen = await showAugmentScreen(stageIndex, options);
     augmentState.owned.push(chosen.id);
     chosen.apply(augmentState);
@@ -3180,6 +3249,37 @@
       }
       addResource(col, resourceGain, colorFloats);
 
+      // ---- 세트 1단계: 카드 색 연결 (해당 색 카드 정답 시 강화) ----
+      if (col === 'red' && setLevel('red') >= 1) {
+        gain += 1;
+        colorFloats.push(['🔴 혈맹 — 빨강 카드 +1', '#ff7b7b']);
+      }
+      if (col === 'yellow' && setLevel('yellow') >= 1) {
+        augmentState.resources.yellow += 1;
+        colorFloats.push(['🟡 황금 — 자원 +1', '#ffd166']);
+      }
+      if (col === 'blue' && setLevel('blue') >= 1) {
+        augmentState.blueGauge++;
+        if (augmentState.blueGauge >= 5) {
+          augmentState.blueGauge = 0;
+          augmentState.hasCardPeek = true;
+          augmentState.peekCharges++;
+          colorFloats.push(['🔵 지혜 게이지 — 투시 +1!', '#7bb7ff']);
+        } else {
+          colorFloats.push([`🔵 지혜 게이지 ${augmentState.blueGauge}/5`, '#7bb7ff']);
+        }
+      }
+      if (col === 'green' && setLevel('green') >= 1) {
+        augmentState.greenGauge++;
+        if (augmentState.greenGauge >= 4) {
+          augmentState.greenGauge = 0;
+          augmentState.shieldCharges++;
+          colorFloats.push(['🟢 생명 게이지 — 방패 +1!', '#5fd8c4']);
+        } else {
+          colorFloats.push([`🟢 생명 게이지 ${augmentState.greenGauge}/4`, '#5fd8c4']);
+        }
+      }
+
       // 색채 공명: 같은 색 연속 정답
       augmentState.sameColorRun = augmentState.lastColor === col ? augmentState.sameColorRun + 1 : 1;
       augmentState.lastColor = col;
@@ -3206,6 +3306,12 @@
       if (isTie && augmentState.tieIsWin) {
         gain += 3;
         colorFloats.push(['🃏 독심술 — 동점 정답 +3', '#7bb7ff']);
+      }
+
+      // 혈맹 1단계: 이번 정답에 콤보 보너스가 하나라도 붙었으면 +1
+      if (setLevel('red') >= 1 && gain > 1 + augmentState.streakBonus) {
+        gain += 1;
+        colorFloats.push(['🔴 혈맹 — 콤보 보너스 +1', '#ff7b7b']);
       }
 
       // 🔥 열기(상점): 남은 횟수 동안 이번 정답 콤보 2배
@@ -3386,6 +3492,10 @@
       const firstColor = Object.keys(cost)[0];
       cost[firstColor] += bought;
     }
+    // 황금 2단계: 전 품목 각 색 비용 −1 (최소 1)
+    if (setLevel('yellow') >= 2) {
+      Object.keys(cost).forEach((c) => { cost[c] = Math.max(1, cost[c] - 1); });
+    }
     return cost;
   }
   function itemStockLeft(item) {
@@ -3455,6 +3565,12 @@
       augmentState.shopStock[item.id] = (augmentState.shopStock[item.id] || 0) + 1;
     }
     item.buy(augmentState);
+    // 생명 1단계: 보호류(방패·면역) 구매 시 50% 확률로 +1
+    if (setLevel('green') >= 1 && (item.id === 'shield' || item.id === 'immunity') && Math.random() < 0.5) {
+      if (item.id === 'shield') augmentState.shieldCharges += 1;
+      else augmentState.deathImmunityCharges += 1;
+      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 40, '🟢 생명 — 보호 +1 보너스!', '#5fd8c4', 20);
+    }
     sfx('pick');
     fx.float(window.innerWidth / 2, window.innerHeight / 2 - 80, `${item.name} 구매!`, '#ffd166', 24);
     renderShop();
@@ -3542,12 +3658,12 @@
     // 증강 색상 세트 안내
     const setTitle = document.createElement('div');
     setTitle.className = 'codex-tier-title t2';
-    setTitle.textContent = '🧩 증강 색상 세트 (같은 색 증강 2개 수집 시 발동)';
+    setTitle.textContent = '🧩 증강 색상 세트 — 학파 (같은 색 2개→1단계 / 4개→2단계)';
     codexBody.appendChild(setTitle);
     Object.values(COLOR_SETS).forEach((set) => {
       const item = document.createElement('div');
       item.className = 'codex-item';
-      item.innerHTML = `<span class="cx-name">${set.icon} ${set.name} 세트</span><span class="cx-desc"><span class="good">${set.bonusText}</span></span>`;
+      item.innerHTML = `<span class="cx-name">${set.icon} ${set.name} (${set.school})</span><span class="cx-desc"><span class="good">1단계:</span> ${set.t1}<br><span class="good">2단계:</span> ${set.t2}</span>`;
       codexBody.appendChild(item);
     });
 
@@ -3614,6 +3730,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.1.0', notes: '기획서 P2 — 세트 시스템 지속형 개편(같은 색 2개→1단계 / 4개→2단계 학파 효과) · 카드 색 연결(혈맹 빨강+1 / 지혜 파랑 게이지 / 생명 초록 게이지 / 황금 노랑 자원) · 지혜2 예언 3분할·생명2 자동무효·혈맹2 룰렛생존 콤보+10·황금2 상점할인' },
     { v: 'v1.0.0', notes: '기획서 v1.0 P0+P1 반영 — 저주 예산제 재가격(확률의 눈 저주삭제·T1, 독심술/색채공명 1회성 총알, 완벽한 기억 방아쇠2회, 기록보호 초록) · 광기의 축복 강제 룰렛 자비 무시(×1) · 검은 계약 즉사 면역불가 · 상점 개편(죽음면역 재고1·정화 신설·열기 대체·구매마다 가격+1·자원6개 개방)' },
     { v: 'v0.9.18', notes: '밸런스 개편 — 자비 구간 2→1회로 축소(총알 저주가 실제 위협이 됨) · 확률의 눈 2단계 이동 · 콤보 마일스톤 상향(25/50/80)·별 등급 상향(40/80) · 광기의 축복/무지개 콤보 하향 · 검은 계약(2회 무효)·불멸의 탄창(3회, 저주 강화) 재조정' },
     { v: 'v0.9.17', notes: '최고 기록 저장(새로고침해도 유지) · 진행 중 재시작 방지 · 룰렛 다중 방아쇠/자비 곡선 버그 수정' },
