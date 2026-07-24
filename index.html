@@ -1354,7 +1354,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.1.0</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.2.0</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -1378,6 +1378,7 @@
     </div>
 
     <button type="button" class="card-peek-btn" id="cardPeekBtn">🔍 다음 카드 확인</button>
+    <button type="button" class="card-peek-btn" id="futureStealBtn" style="background:linear-gradient(135deg,#7a2ea0,#b45cd4);">🕳 미래 절취</button>
 
     <div class="message" id="message"></div>
 
@@ -1714,7 +1715,7 @@
       id: 'odds-eye',
       name: '확률의 눈',
       tier: 1,
-      color: 'blue',
+      color: 'yellow',
       good: '업/다운 성공 확률을 % 로 표시',
       bad: '없음',
       apply(s) { s.hasOddsEye = true; },
@@ -1865,6 +1866,85 @@
       good: '정답마다 연속 성공 +2',
       bad: '정답 6번마다 강제 룰렛 발동 (자비 없이 실확률로 발사)',
       apply(s) { s.streakBonus += 1; s.forcedRouletteEvery = 6; },
+    },
+
+    // ---- 신규 8종 (기획서 §4) ----
+    {
+      id: 'insurance',
+      name: '보험 계약',
+      tier: 1,
+      color: 'green',
+      good: '룰렛을 돌릴 때마다 (생존 여부 무관) 🟢 자원 +2',
+      bad: '없음',
+      apply(s) { s.hasInsurance = true; },
+    },
+    {
+      id: 'centrism',
+      name: '중용의 길',
+      tier: 1,
+      color: 'blue',
+      good: '덱에서 남은 5·6 카드를 전부 제거 (예측이 쉬워짐)',
+      bad: '승부수(5·6) 보너스도 사라짐',
+      apply(s) {
+        s.hasCentrism = true;
+        const removed = deck.filter((c) => c.number === 5 || c.number === 6);
+        deck = deck.filter((c) => c.number !== 5 && c.number !== 6);
+        removed.forEach((c) => markUsed(c));
+      },
+    },
+    {
+      id: 'future-steal',
+      name: '미래 절취',
+      tier: 2,
+      color: 'blue',
+      good: '다음 카드를 보고 덱 맨 밑으로 보내기 (판당 2회)',
+      bad: '획득 후 다음 실패 1회 총알 +1발 (1회성)',
+      apply(s) { s.futureStealCharges += 2; s.pendingBulletBonus += 1; },
+    },
+    {
+      id: 'thrill-addiction',
+      name: '전율 중독',
+      tier: 2,
+      color: 'red',
+      good: '룰렛에서 살아남을 때마다 콤보 +6',
+      bad: '실패 시 방아쇠 +1회',
+      apply(s) { s.hasThrill = true; },
+    },
+    {
+      id: 'acrobat',
+      name: '곡예사',
+      tier: 2,
+      color: 'yellow',
+      good: '근접 보너스 2배 (차이1 → +4, 차이2 → +2)',
+      bad: '차이 5 이상으로 맞힌 정답은 콤보 0',
+      apply(s) { s.hasAcrobat = true; },
+    },
+    {
+      id: 'longshot',
+      name: '역배당',
+      tier: 3,
+      color: 'red',
+      good: '남은 카드가 적은 쪽을 맞히면 콤보 3배',
+      bad: '많은 쪽을 맞히면 콤보 절반',
+      apply(s) { s.hasLongshot = true; },
+    },
+    {
+      id: 'comeback',
+      name: '오뚝이',
+      tier: 3,
+      color: 'green',
+      good: '룰렛 생존 직후 정답 3회는 콤보 2배',
+      bad: '영구 총알 +1발',
+      apply(s) { s.hasComeback = true; s.bulletCurses += 1; },
+    },
+    {
+      id: 'alchemist',
+      name: '연금술사',
+      tier: 3,
+      color: 'yellow',
+      good: '10장 진행마다 전 색 자원 +1 (이자)',
+      bad: '상점 전 품목 가격 +1',
+      apply(s) { s.hasAlchemist = true; },
     },
   ];
 
@@ -2019,6 +2099,16 @@
       deathImmunityCharges: 0,   // 죽음 면역 (상점/마일스톤)
       milestonesClaimed: [false, false, false], // 콤보 마일스톤 달성 여부
       bulletRemovals: 0,         // 총알 제거권: 다음 룰렛에서 총알 -1발
+      // ---- 신규 증강 (P3) ----
+      hasInsurance: false,       // 보험 계약: 룰렛마다 🟢 +2
+      hasCentrism: false,        // 중용의 길: 승부수 무효
+      futureStealCharges: 0,     // 미래 절취: 다음 카드 덱 맨 밑으로
+      hasThrill: false,          // 전율 중독: 룰렛 생존 시 콤보 +6 / 실패 방아쇠 +1
+      hasAcrobat: false,         // 곡예사: 근접 2배 / 먼 정답 콤보 0
+      hasLongshot: false,        // 역배당: 적은 쪽 3배 / 많은 쪽 절반
+      hasComeback: false,        // 오뚝이: 룰렛 생존 직후 정답 3회 2배
+      comebackCharges: 0,        // 오뚝이 발동 중 남은 2배 횟수
+      hasAlchemist: false,       // 연금술사: 10장마다 전 색 +1 / 상점 +1
       // ---- 상점 ----
       heatCharges: 0,            // 🔥 열기: 남은 정답 콤보 2배 횟수
       shopPurchases: {},         // 아이템별 구매 횟수 (가격 상승제)
@@ -2294,6 +2384,10 @@
     const show = augmentState.hasCardPeek && augmentState.peekCharges > 0;
     cardPeekBtn.textContent = `🔍 다음 카드 확인 (${augmentState.peekCharges}회)`;
     cardPeekBtn.classList.toggle('show', show && !peekActive);
+    // 미래 절취 버튼
+    const fsShow = augmentState.futureStealCharges > 0 && deck.length > 0;
+    futureStealBtn.textContent = `🕳 미래 절취 (${augmentState.futureStealCharges}회)`;
+    futureStealBtn.classList.toggle('show', fsShow && !peekActive);
   }
 
   cardPeekBtn.addEventListener('click', () => {
@@ -2314,6 +2408,28 @@
     refreshCardPeekUI();
     renderOwnedAugments();
     sfx('tie');
+  });
+
+  // 미래 절취: 다음 카드를 잠깐 보여주고 덱 맨 밑으로 보낸다 (판당 charges 소모)
+  const futureStealBtn = document.getElementById('futureStealBtn');
+  futureStealBtn.addEventListener('click', () => {
+    if (peekActive || augmentState.futureStealCharges <= 0 || deck.length === 0) return;
+    augmentState.futureStealCharges--;
+    const stolen = deck.pop();      // 맨 위(다음 카드) 꺼내서
+    deck.unshift(stolen);           // 맨 밑으로 보낸다
+    // 새로 올라온 다음 카드를 공개
+    peekActive = true;
+    const top = deck[deck.length - 1];
+    renderCard(nextCardEl, top);
+    nextCardEl.classList.add('peeked', 'flip');
+    const c = fx.centerOf(nextCardEl);
+    fx.burst(c.x, c.y, { count: 24, colors: ['#b45cd4', '#e0a7f0', '#fff'], spread: 120 });
+    fx.float(c.x, c.y - 60, `🕳 ${stolen.number} ${stolen.label} 카드를 덱 맨 밑으로!`, '#e0a7f0', 18);
+    refreshCardPeekUI();
+    renderMemoryHint();
+    renderProphecyHint();
+    renderOwnedAugments();
+    sfx('spin');
   });
 
   // 덱 진행 바 위의 증강 등장 지점 눈금 생성 (게임 시작 시 1회)
@@ -2435,6 +2551,12 @@
     }
     if (s.heatCharges > 0) {
       items.push({ cls: 'buff', text: `🔥 열기 ${s.heatCharges}회`, tip: '다음 정답들의 콤보 획득이 2배가 됩니다. 정답마다 1회씩 소모됩니다.' });
+    }
+    if (s.comebackCharges > 0) {
+      items.push({ cls: 'buff', text: `🛟 오뚝이 2배 ${s.comebackCharges}회`, tip: '룰렛 생존 직후라 다음 정답들의 콤보가 2배입니다.' });
+    }
+    if (s.futureStealCharges > 0) {
+      items.push({ cls: 'buff', text: `🕳 미래 절취 ${s.futureStealCharges}회`, tip: '다음 카드를 확인하고 덱 맨 밑으로 보낼 수 있습니다 (카드 아래 버튼).' });
     }
     // 다음 콤보 마일스톤 안내
     const nextMs = COMBO_MILESTONES.find((m, i) => !s.milestonesClaimed[i]);
@@ -2751,8 +2873,16 @@
     if (augmentState.hasProphecy) pulls++;
     if (augmentState.hasGamblersBlood) pulls++;
     if (augmentState.perfectMemoryExtraPull) pulls++; // 완벽한 기억 저주
+    if (augmentState.hasThrill) pulls++;              // 전율 중독 저주
     pulls += augmentState.pendingExtraPulls; // 빨강 오답 등의 추가 방아쇠
     augmentState.pendingExtraPulls = 0;
+
+    // 보험 계약: 룰렛을 돌리는 것 자체로 🟢 자원 +2
+    if (augmentState.hasInsurance) {
+      augmentState.resources.green += 2;
+      const c = fx.centerOf(roulettePanel);
+      fx.float(c.x, c.y + 30, '🟢 보험금 +2', '#5fd8c4', 18);
+    }
     let died = false;
     for (let i = 0; i < pulls; i++) {
       // 강제 결과(forced)는 딱 1번의 방아쇠만 보호/확정한다. 예언·도박사의
@@ -2798,14 +2928,24 @@
       died = false;
     }
 
-    // 혈맹 2단계: 룰렛에서 살아남으면 콤보 +10
-    if (!died && setLevel('red') >= 2) {
-      streak += 10;
-      setBest(streak);
-      if (streak > runBest) runBest = streak;
-      updateStats();
+    // 룰렛에서 살아남았을 때의 생존 보상들
+    if (!died) {
       const c = fx.centerOf(roulettePanel);
-      fx.float(c.x, c.y - 40, '🔴 혈맹 — 생존 콤보 +10!', '#ff7b7b', 20);
+      let survivalCombo = 0;
+      if (setLevel('red') >= 2) survivalCombo += 10;   // 혈맹 2단계
+      if (augmentState.hasThrill) survivalCombo += 6;  // 전율 중독
+      if (survivalCombo > 0) {
+        streak += survivalCombo;
+        setBest(streak);
+        if (streak > runBest) runBest = streak;
+        updateStats();
+        fx.float(c.x, c.y - 40, `⚡ 생존 콤보 +${survivalCombo}!`, '#ff7b7b', 20);
+      }
+      // 오뚝이: 생존 직후 정답 3회 콤보 2배 발동
+      if (augmentState.hasComeback) {
+        augmentState.comebackCharges = 3;
+        fx.float(c.x, c.y - 68, '🛟 오뚝이 — 다음 3정답 2배!', '#5fd8c4', 18);
+      }
     }
     return died;
   }
@@ -3206,6 +3346,11 @@
     const prevStreak = streak;
     const next = deck.pop();
     augmentState.cardsAdvanced++;
+    // 연금술사: 10장 진행마다 전 색 자원 +1 (이자)
+    if (augmentState.hasAlchemist && augmentState.cardsAdvanced % 10 === 0) {
+      ['red', 'blue', 'green', 'yellow'].forEach((c) => { augmentState.resources[c] += 1; });
+      fx.float(window.innerWidth / 2, 140, '⚗️ 연금술사 이자 — 전 색 +1', '#ffd166', 20);
+    }
     peekActive = false; // 새 카드가 공개되므로 투시 상태 해제
     renderCard(nextCardEl, next);
     markUsed(next);
@@ -3224,8 +3369,10 @@
 
     if (correct === true) {
       // 근접 보너스: 차이 1이면 +2, 차이 2면 +1 (아슬아슬할수록 점수 UP)
+      // 곡예사: 근접 보너스 2배
       const diff = Math.abs(next.number - currentCard.number);
-      const closeBonus = isTie ? 0 : diff === 1 ? 2 : diff === 2 ? 1 : 0;
+      let closeBonus = isTie ? 0 : diff === 1 ? 2 : diff === 2 ? 1 : 0;
+      if (closeBonus > 0 && augmentState.hasAcrobat) closeBonus *= 2;
       let gain = 1 + augmentState.streakBonus + closeBonus;
       const colorFloats = []; // [텍스트, 색상]
 
@@ -3237,7 +3384,7 @@
 
       // ---- 특별 숫자 효과 ----
       const num = next.number;
-      if (num === 5 || num === 6) {
+      if ((num === 5 || num === 6) && !augmentState.hasCentrism) {
         gain += 2;
         colorFloats.push(['🎲 승부수 +2', '#ff9d5c']);
       } else if (num === 7) {
@@ -3306,6 +3453,34 @@
       if (isTie && augmentState.tieIsWin) {
         gain += 3;
         colorFloats.push(['🃏 독심술 — 동점 정답 +3', '#7bb7ff']);
+      }
+
+      // 곡예사 저주: 차이 5 이상으로 맞힌 정답은 콤보 0
+      if (augmentState.hasAcrobat && !isTie && diff >= 5) {
+        gain = 0;
+        colorFloats.push(['🤸 곡예사 — 너무 멀어 콤보 0', '#ffd166']);
+      }
+
+      // 역배당: 선택 방향의 남은 카드가 적었으면 3배, 많았으면 절반
+      if (augmentState.hasLongshot && !isTie && gain > 0) {
+        const higher = deck.filter((c) => c.number > currentCard.number).length;
+        const lower = deck.filter((c) => c.number < currentCard.number).length;
+        const chosen = direction === 'up' ? higher : lower;
+        const other = direction === 'up' ? lower : higher;
+        if (chosen < other) {
+          gain *= 3;
+          colorFloats.push(['🎰 역배당 — 적은 쪽! 콤보 3배', '#ff7b7b']);
+        } else if (chosen > other) {
+          gain = Math.floor(gain / 2);
+          colorFloats.push(['🎰 역배당 — 많은 쪽... 콤보 절반', '#ff9d9d']);
+        }
+      }
+
+      // 오뚝이: 룰렛 생존 직후 정답 3회는 콤보 2배
+      if (augmentState.comebackCharges > 0 && gain > 0) {
+        gain *= 2;
+        augmentState.comebackCharges--;
+        colorFloats.push([`🛟 오뚝이 — 콤보 2배! (${augmentState.comebackCharges}회 남음)`, '#5fd8c4']);
       }
 
       // 혈맹 1단계: 이번 정답에 콤보 보너스가 하나라도 붙었으면 +1
@@ -3491,6 +3666,11 @@
     if (bought > 0) {
       const firstColor = Object.keys(cost)[0];
       cost[firstColor] += bought;
+    }
+    // 연금술사 저주: 전 품목 첫 색 +1
+    if (augmentState.hasAlchemist) {
+      const fc = Object.keys(cost)[0];
+      cost[fc] += 1;
     }
     // 황금 2단계: 전 품목 각 색 비용 −1 (최소 1)
     if (setLevel('yellow') >= 2) {
@@ -3730,6 +3910,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.2.0', notes: '기획서 P3 — 신규 증강 8종 추가(보험 계약·중용의 길·미래 절취·전율 중독·곡예사·역배당·오뚝이·연금술사). 총 28종, 색 7·7·7·7 균형. 미래 절취 버튼·오뚝이 콤보2배 등 신규 UI 반영' },
     { v: 'v1.1.0', notes: '기획서 P2 — 세트 시스템 지속형 개편(같은 색 2개→1단계 / 4개→2단계 학파 효과) · 카드 색 연결(혈맹 빨강+1 / 지혜 파랑 게이지 / 생명 초록 게이지 / 황금 노랑 자원) · 지혜2 예언 3분할·생명2 자동무효·혈맹2 룰렛생존 콤보+10·황금2 상점할인' },
     { v: 'v1.0.0', notes: '기획서 v1.0 P0+P1 반영 — 저주 예산제 재가격(확률의 눈 저주삭제·T1, 독심술/색채공명 1회성 총알, 완벽한 기억 방아쇠2회, 기록보호 초록) · 광기의 축복 강제 룰렛 자비 무시(×1) · 검은 계약 즉사 면역불가 · 상점 개편(죽음면역 재고1·정화 신설·열기 대체·구매마다 가격+1·자원6개 개방)' },
     { v: 'v0.9.18', notes: '밸런스 개편 — 자비 구간 2→1회로 축소(총알 저주가 실제 위협이 됨) · 확률의 눈 2단계 이동 · 콤보 마일스톤 상향(25/50/80)·별 등급 상향(40/80) · 광기의 축복/무지개 콤보 하향 · 검은 계약(2회 무효)·불멸의 탄창(3회, 저주 강화) 재조정' },
