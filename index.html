@@ -1397,7 +1397,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.4.4</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.4.5</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -2700,7 +2700,7 @@
   }
 
   // 공개된 next 카드가 왼쪽 current 슬롯으로 날아가는 연출
-  function flyToCurrent() {
+  function flyToCurrent(durationSec = 0.55) {
     return new Promise((resolve) => {
       const startRect = nextCardEl.getBoundingClientRect();
       const endRect = currentCardEl.getBoundingClientRect();
@@ -2726,7 +2726,7 @@
       clone.getBoundingClientRect(); // 강제 리플로우
 
       requestAnimationFrame(() => {
-        clone.style.transition = 'left 0.55s cubic-bezier(.4,0,.2,1), top 0.55s cubic-bezier(.4,0,.2,1)';
+        clone.style.transition = `left ${durationSec}s cubic-bezier(.4,0,.2,1), top ${durationSec}s cubic-bezier(.4,0,.2,1)`;
         clone.style.left = endRect.left + 'px';
         clone.style.top = endRect.top + 'px';
       });
@@ -2741,7 +2741,7 @@
       clone.addEventListener('transitionend', (e) => {
         if (e.propertyName === 'left') finish();
       });
-      setTimeout(finish, 700);
+      setTimeout(finish, durationSec * 1000 + 150);
     });
   }
 
@@ -4062,6 +4062,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.4.5', notes: '튜토리얼 — 카드 공개 후 1초 멈춤 + 이동 애니메이션 느리게(1.4초)로 잘 보이게' },
     { v: 'v1.4.4', notes: '튜토리얼 확장 — 카드 이동 중 카드 영역 강조 · 다운 체험 단계 추가(다운만 강조)' },
     { v: 'v1.4.3', notes: '튜토리얼 말풍선을 눌러야 할 버튼 바로 옆에 배치 · 업 버튼만 강조' },
     { v: 'v1.4.2', notes: '튜토리얼을 인터랙티브로 — 유저가 직접 업을 눌러 2→5(정답)→4(오답)→룰렛(안전)을 체험' },
@@ -4212,10 +4213,11 @@
       fx.flash('rgba(230, 57, 70, 0.2)', 300);
       sfx('wrong');
     }
-    // 카드가 움직이는 동안 카드 영역을 강조
+    // 공개된 카드를 잠깐 보여준 뒤, 천천히 이동시키며 카드 영역을 강조
     tutorialHighlight('.table', tutorialStepNo.textContent,
-      '카드가 움직여요! 오른쪽 카드가 <b>왼쪽으로 이동</b>해 새 기준이 됩니다.', false);
-    await flyToCurrent();
+      `오른쪽 카드가 <b>${card.number}</b>! 이 카드가 <b>왼쪽으로 이동</b>해 새 기준이 됩니다.`, false);
+    await new Promise((r) => setTimeout(r, 1000));
+    await flyToCurrent(1.4);
     currentCard = card;
     renderCard(currentCardEl, currentCard);
     currentCardEl.style.opacity = '1';
