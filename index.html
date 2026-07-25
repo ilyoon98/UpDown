@@ -1420,7 +1420,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.5.3</span>
+  <span class="version" id="versionTag">v1.5.4</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4094,6 +4094,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.4', notes: '튜토리얼 — 증강을 먼저 고르게 하고 그 뒤에 설명 팝업(증강 화면에 안내가 가려지던 문제 해결)' },
     { v: 'v1.5.3', notes: '튜토리얼 단계 번호 통일(1/6~6/6) — 1/3에서 3/5로 튀던 표기 버그 수정' },
     { v: 'v1.5.2', notes: '버전 표시를 우측 상단으로 이동 · 튜토리얼에서 증강 반드시 선택 + 획득 피드백 · 세트(학파) 설명 단계 추가' },
     { v: 'v1.5.1', notes: '튜토리얼 — 다운 단계 4→3으로 근접 보너스 체험 · 완료 팝업 중앙 대형 강조(도전 카드 수 표시) · 완료 후 새 라운드 시작' },
@@ -4299,21 +4300,23 @@
     } else if (tStep === 2) {
       await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 3 }, true, '정답! 3은 4보다 낮죠 🎯 아슬아슬하게 맞혀 보너스!', false);
       tStep = 3;
-      // 증강 데모: 실제 선택 화면을 띄워 하나 반드시 골라보게 한다
-      tutorialHighlight(null, '5 / 6',
-        '카드를 진행하면 <b>증강</b>을 골라 강해져요. 강한 증강엔 <b>저주(대가)</b>가 따르죠.<br>아래 셋 중 하나를 <b>반드시 골라보세요!</b>', false);
-      await new Promise((r) => setTimeout(r, 1400));
+      // 증강 데모: 안내 없이 실제 선택 화면을 먼저 띄운다 (하나 반드시 선택)
       tutorialOverlay.classList.remove('show'); // 증강 화면이 보이도록 잠시 숨김
       const demoIds = ['iron-heart', 'card-peek', 'gamblers-blood'];
       const demoOpts = demoIds.map((id) => AUGMENTS.find((a) => a.id === id));
       const chosen = await showAugmentScreen(0, demoOpts);
       tutorialOverlay.classList.add('show');
       tStep = 4;
-      // 세트(학파) 설명
-      tutorialHighlight(null, '6 / 6',
-        `<b>『${chosen.name}』</b> 획득! ✨<br><br>증강마다 <b>색(학파)</b>이 있어요. 같은 색을 <b>2개 모으면 1단계</b>, <b>4개 모으면 2단계</b> 세트 효과가 발동해 훨씬 강해집니다.<br>🔴혈맹 · 🔵지혜 · 🟢생명 · 🟡황금 — 자세한 건 <b>📖 도감</b>에서!`, true);
+      // 선택 후에 증강이 무엇인지 설명 (증강 화면에 가려지지 않도록 선택 뒤 안내)
+      tutorialHighlight(null, '5 / 6',
+        `방금 <b>『${chosen.name}』</b> 증강을 골랐어요! ✨<br>카드를 진행하면 이렇게 <b>증강</b>을 골라 강해집니다. 강한 증강엔 <b>저주(대가)</b>가 따라요.`, true);
     }
     tutorialBusy = false;
+  }
+
+  function showSetExplain() {
+    tutorialHighlight(null, '6 / 6',
+      '증강마다 <b>색(학파)</b>이 있어요. 같은 색을 <b>2개 모으면 1단계</b>, <b>4개 모으면 2단계</b> 세트 효과가 발동해 훨씬 강해집니다.<br>🔴혈맹 · 🔵지혜 · 🟢생명 · 🟡황금 — 자세한 건 <b>📖 도감</b>에서!', true);
   }
 
   function showTutorialFinal() {
@@ -4325,8 +4328,9 @@
   }
 
   tutorialNextBtn.addEventListener('click', () => {
-    if (tStep === 4) { tStep = 5; showTutorialFinal(); }
-    else if (tStep >= 5) endTutorial();
+    if (tStep === 4) { tStep = 5; showSetExplain(); }
+    else if (tStep === 5) { tStep = 6; showTutorialFinal(); }
+    else if (tStep >= 6) endTutorial();
   });
   document.getElementById('tutorialSkip').addEventListener('click', endTutorial);
 
