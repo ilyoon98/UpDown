@@ -1325,7 +1325,7 @@
   }
   .update-toast.show { display: inline-block; }
 
-  #changelogBtn {
+  #changelogBtn, #helpBtn {
     background: #3a3a52;
     color: #eee;
     padding: 13px 26px;
@@ -1333,7 +1333,7 @@
     border: 1px solid #55557a;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   }
-  #changelogBtn:hover { background: #47476a; }
+  #changelogBtn:hover, #helpBtn:hover { background: #47476a; }
 
   /* 버전 로그 */
   .cl-version {
@@ -1394,12 +1394,13 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.4.0</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.4.1</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
+  <button type="button" id="helpBtn">❓ 도움말</button>
   <button type="button" id="changelogBtn">📜 버전 로그</button>
 </div>
 
@@ -4016,6 +4017,8 @@
     startOverlay.classList.remove('show');
     sfx('pick');
     fx.confetti(30);
+    // 첫 플레이면 시작 화면을 닫은 뒤 튜토리얼 실행 (겹침 방지)
+    if (isFirstRun) setTimeout(startTutorial, 350);
   });
 
   document.addEventListener('keydown', (e) => {
@@ -4045,6 +4048,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.4.1', notes: '튜토리얼이 시작 화면 뒤에 뜨도록 수정(겹침 해결) · 우상단 ❓도움말 버튼 추가(누르면 새 게임 + 튜토리얼)' },
     { v: 'v1.4.0', notes: '첫 플레이 튜토리얼(단계별 강조) 추가 · 콤보 마일스톤 강화(12/25/40/60/90, 문턱↓·보상↑) · 예언 범위 확대(1~7 / 4~10 겹침) · 미래 절취는 카드 안 보고 뒤로 · 모바일 룰렛 자동 스크롤 · 세트 효과 도감 가독성 개선' },
     { v: 'v1.3.1', notes: '밸런스 — 확률의 눈 너프(상시 % → 충전형 5회 확인 버튼) · 흐릿한 예언 너프(정확한 1~5/6~10 → 모호한 3구간, 지혜 2단계에서만 정밀)' },
     { v: 'v1.3.0', notes: '기획서 P4 — 딜러의 최후(마지막 6장: 총알+1·콤보2배·붉은 톤다운 연출) · 첫 시도 오프닝(첫 증강 고정 3택: 강철 심장/카드 투시/도박사의 피) · 상점 중반 개방(P1에 반영됨)' },
@@ -4161,10 +4165,16 @@
   });
   document.getElementById('tutorialSkip').addEventListener('click', endTutorial);
 
+  // 도움말 버튼: 게임을 새로 시작하고 튜토리얼을 다시 보여준다
+  document.getElementById('helpBtn').addEventListener('click', () => {
+    startOverlay.classList.remove('show');
+    startGame();
+    setTimeout(startTutorial, 300);
+  });
+
   buildCardGrid();
   buildCylinder();
   startGame();
-  if (isFirstRun) setTimeout(startTutorial, 400);
 </script>
 
 </body>
