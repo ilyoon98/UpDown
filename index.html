@@ -1369,7 +1369,7 @@
     border-width: 2px;
     box-shadow: 0 0 40px rgba(255, 209, 102, 0.4), 0 20px 50px rgba(0, 0, 0, 0.6);
   }
-  .tutorial-box.final .tutorial-text { font-size: 18px; }
+  .tutorial-box.final .tutorial-text { font-size: 22px; }
   .tutorial-cards-left {
     font-size: 46px;
     font-weight: 900;
@@ -1398,11 +1398,12 @@
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
     text-align: center;
   }
-  .tutorial-step-no { font-size: 12px; font-weight: 800; color: var(--gold); margin-bottom: 6px; }
-  .tutorial-text { font-size: 15px; line-height: 1.6; color: #f0f0f0; margin-bottom: 14px; }
-  .tutorial-actions { display: flex; gap: 10px; justify-content: center; }
-  #tutorialSkip { background: #3a3a52; color: #bbb; padding: 9px 18px; font-size: 14px; }
-  #tutorialNext { background: var(--gold); color: #1e1e2e; padding: 9px 24px; font-size: 15px; }
+  .tutorial-box { width: min(500px, 92vw); padding: 22px 24px; }
+  .tutorial-step-no { font-size: 15px; font-weight: 800; color: var(--gold); margin-bottom: 8px; }
+  .tutorial-text { font-size: 20px; line-height: 1.65; color: #f5f5f5; margin-bottom: 18px; }
+  .tutorial-actions { display: flex; gap: 12px; justify-content: center; }
+  #tutorialSkip { background: #3a3a52; color: #ccc; padding: 12px 22px; font-size: 16px; }
+  #tutorialNext { background: var(--gold); color: #1e1e2e; padding: 12px 30px; font-size: 17px; font-weight: 800; }
 
   .fx-float {
     position: fixed;
@@ -1420,7 +1421,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.5.5</span>
+  <span class="version" id="versionTag">v1.5.6</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4094,6 +4095,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.6', notes: '튜토리얼 글씨 키우고 문장 쉽게 · 건너뛰기하면 증강 화면까지 닫고 새 게임 시작' },
     { v: 'v1.5.5', notes: '튜토리얼 증강 단계 개선 — 증강 화면 위에 설명 팝업이 함께 뜨고 첫 카드만 강조·선택 가능, 세트 설명은 보유 증강 패널을 강조' },
     { v: 'v1.5.4', notes: '튜토리얼 — 증강을 먼저 고르게 하고 그 뒤에 설명 팝업(증강 화면에 안내가 가려지던 문제 해결)' },
     { v: 'v1.5.3', notes: '튜토리얼 단계 번호 통일(1/6~6/6) — 1/3에서 3/5로 튀던 표기 버그 수정' },
@@ -4251,13 +4253,17 @@
     downBtn.disabled = true; // 튜토리얼은 업만 사용
     tutorialOverlay.classList.add('show');
     tutorialHighlight('#upBtn', '1 / 6',
-      '지금 카드는 <b>2</b>. 다음 카드가 더 높을 것 같으면 <b>업</b>이에요.<br>이 <b>▲ 업</b> 버튼을 눌러보세요!', false);
+      '지금 카드는 <b>2</b>예요.<br>다음 카드가 <b>2보다 클까요?</b><br>크다고 생각하면 <b>▲ 업</b>을 눌러요!', false);
   }
 
   function endTutorial() {
     tutorialOverlay.classList.remove('show');
+    tutorialBox.classList.remove('final');
+    // 증강 단계에서 건너뛰어도 증강 화면이 남지 않게 함께 닫는다
+    augmentOverlay.classList.remove('show', 'peeking');
+    peekBtn.classList.remove('show');
     tutorialMode = false;
-    startGame();
+    startGame(); // 새 게임으로 시작
   }
 
   // 카드 공개 → 왼쪽으로 이동 → 새 기준 카드 확정.
@@ -4306,19 +4312,19 @@
       await tutorialRevealAndMove({ suit: 'green', label: '초록', number: 5 }, true, '정답! 5는 2보다 높죠 🎉', true);
       tStep = 1;
       tutorialHighlight('#upBtn', '2 / 6',
-        '좋아요! 이번엔 <b>일부러 틀려</b>볼게요. 지금 카드는 <b>5</b>.<br>다시 <b>▲ 업</b> 버튼을 눌러보세요.', false);
+        '맞았어요! 👍<br>이번엔 <b>일부러 틀려</b>볼게요.<br>다시 <b>▲ 업</b>을 눌러요.', false);
       upBtn.disabled = false;
     } else if (tStep === 1) {
       await tutorialRevealAndMove({ suit: 'red', label: '빨강', number: 4 }, false, '앗! 4는 5보다 낮아요. 틀렸습니다!', false);
       tutorialHighlight('#roulettePanel', '3 / 6',
-        '틀리면 <b>러시안 룰렛</b>을 돌려요. 총알에 맞으면 게임 오버!<br>이번엔 튜토리얼이라 <b>안전하게</b> 살려드릴게요...', false);
+        '틀리면 <b>룰렛</b>을 돌려요.<br>총알에 맞으면 <b>게임 끝!</b><br>(지금은 안전하니 걱정 마세요)', false);
       if (window.innerWidth <= 1100) roulettePanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await new Promise((r) => setTimeout(r, 600));
       await playRoulette(null, 1); // failNum 1 → 자비 곡선으로 무조건 생존
       tStep = 2;
       downBtn.disabled = false;
       tutorialHighlight('#downBtn', '4 / 6',
-        '살았어요! 🍀 이번엔 <b>다운</b>이에요. 지금 카드는 <b>4</b>.<br>더 낮은 카드가 나올 것 같으면 이 <b>▼ 다운</b> 버튼을 눌러보세요. (차이가 작으면 <b>근접 보너스</b>!)', false);
+        '살았어요! 🍀<br>지금 카드는 <b>4</b>. 다음이 <b>더 작을 것 같으면</b><br><b>▼ 다운</b>을 눌러요!', false);
     } else if (tStep === 2) {
       await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 3 }, true, '정답! 3은 4보다 낮죠 🎯 아슬아슬하게 맞혀 보너스!', false);
       tStep = 3;
@@ -4335,21 +4341,21 @@
         if (i > 0) cardEl.querySelectorAll('.augment-pick').forEach((b) => { b.disabled = true; b.style.opacity = '0.4'; });
       });
       tutorialHighlightEl(firstCard, '5 / 6',
-        '이게 <b>증강</b>! <b>축복</b>(좋은 효과)과 <b>저주</b>(대가)가 함께 있어요.<br>강조된 <b>『강철 심장』</b>의 <b>✔ 선택</b> 버튼을 눌러보세요.', false);
+        '이건 <b>증강</b>이에요! ✨<br><b>좋은 효과</b>와 <b>나쁜 효과</b>가 같이 있어요.<br>밝게 빛나는 카드의 <b>✔ 선택</b>을 눌러요.', false);
       const chosen = await pick;
       augmentState.owned.push(chosen.id); // 보유 증강 패널에 보이도록 실제로 추가
       renderOwnedAugments();
       tStep = 4;
       // 세트(학파) 설명 — 방금 고른 증강이 쌓인 '보유 증강' 패널을 강조
       tutorialHighlight('.owned-panel', '6 / 6',
-        `방금 <b>『${chosen.name}』</b>이 여기 쌓였어요! 증강엔 <b>색(학파)</b>이 있고,<br>같은 색을 <b>2개 → 1단계 / 4개 → 2단계</b> 모으면 세트 효과가 발동해요.<br>🔴혈맹 · 🔵지혜 · 🟢생명 · 🟡황금 (자세한 건 📖 도감)`, true);
+        `고른 증강은 <b>여기</b>에 모여요.<br>증강마다 <b>색</b>이 있는데, <b>같은 색을 모으면</b> 더 세져요!<br>🔴 🔵 🟢 🟡`, true);
     }
     tutorialBusy = false;
   }
 
   function showTutorialFinal() {
     tutorialHighlight(null, '완료 🎉',
-      '이제 다 배웠어요! 🍀 <b>업/다운을 맞히고 룰렛을 견디며 카드를 전부 넘기면 승리</b>예요.<br><div class="tutorial-cards-left">40장 도전!</div>색 카드로 자원을 모으면 <b>상점</b>이 열립니다. 행운을 빌어요!', true);
+      '이제 다 배웠어요! 🍀<br><b>카드를 전부 넘기면 승리!</b><div class="tutorial-cards-left">40장 도전!</div>행운을 빌어요 😊', true);
     tutorialBox.classList.add('final');
     fx.confetti(70);
     sfx('win');
