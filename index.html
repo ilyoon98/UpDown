@@ -1420,7 +1420,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.5.4</span>
+  <span class="version" id="versionTag">v1.5.5</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4094,6 +4094,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.5', notes: '튜토리얼 증강 단계 개선 — 증강 화면 위에 설명 팝업이 함께 뜨고 첫 카드만 강조·선택 가능, 세트 설명은 보유 증강 패널을 강조' },
     { v: 'v1.5.4', notes: '튜토리얼 — 증강을 먼저 고르게 하고 그 뒤에 설명 팝업(증강 화면에 안내가 가려지던 문제 해결)' },
     { v: 'v1.5.3', notes: '튜토리얼 단계 번호 통일(1/6~6/6) — 1/3에서 3/5로 튀던 표기 버그 수정' },
     { v: 'v1.5.2', notes: '버전 표시를 우측 상단으로 이동 · 튜토리얼에서 증강 반드시 선택 + 획득 피드백 · 세트(학파) 설명 단계 추가' },
@@ -4213,6 +4214,27 @@
     }
   }
 
+  // DOM 요소를 직접 강조 (querySelector로 못 잡는 동적 카드용)
+  function tutorialHighlightEl(el, stepLabel, html, showNext) {
+    tutorialStepNo.textContent = stepLabel;
+    tutorialText.innerHTML = html;
+    tutorialNextBtn.style.display = showNext ? '' : 'none';
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const pad = 8;
+      tutorialHole.style.display = 'block';
+      tutorialHole.style.left = (r.left - pad) + 'px';
+      tutorialHole.style.top = (r.top - pad) + 'px';
+      tutorialHole.style.width = (r.width + pad * 2) + 'px';
+      tutorialHole.style.height = (r.height + pad * 2) + 'px';
+      const belowSpace = window.innerHeight - r.bottom;
+      tutorialBox.style.left = Math.min(Math.max(r.left + r.width / 2, 240), window.innerWidth - 240) + 'px';
+      tutorialBox.style.transform = 'translateX(-50%)';
+      if (belowSpace > 210) { tutorialBox.style.top = (r.bottom + 16) + 'px'; tutorialBox.style.bottom = 'auto'; }
+      else { tutorialBox.style.top = 'auto'; tutorialBox.style.bottom = (window.innerHeight - r.top + 16) + 'px'; }
+    }
+  }
+
   function startTutorial() {
     tutorialMode = true;
     tStep = 0;
@@ -4300,23 +4322,29 @@
     } else if (tStep === 2) {
       await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 3 }, true, '정답! 3은 4보다 낮죠 🎯 아슬아슬하게 맞혀 보너스!', false);
       tStep = 3;
-      // 증강 데모: 안내 없이 실제 선택 화면을 먼저 띄운다 (하나 반드시 선택)
-      tutorialOverlay.classList.remove('show'); // 증강 화면이 보이도록 잠시 숨김
+      // 증강 화면을 띄우되 튜토리얼 오버레이는 유지 — 첫 카드를 강조하며 설명한다
       const demoIds = ['iron-heart', 'card-peek', 'gamblers-blood'];
       const demoOpts = demoIds.map((id) => AUGMENTS.find((a) => a.id === id));
-      const chosen = await showAugmentScreen(0, demoOpts);
-      tutorialOverlay.classList.add('show');
+      const pick = showAugmentScreen(0, demoOpts); // Promise (선택 시 resolve)
+      await new Promise((r) => setTimeout(r, 750)); // 카드 등장 애니메이션 후
+      // 강조된 첫 카드('강철 심장')만 반짝이게 하고 나머지 선택 버튼은 잠근다
+      const firstCard = augmentCardsEl.querySelector('.augment-card');
+      // 리롤은 전부 잠그고(강조 카드가 바뀌지 않게), 첫 카드 외 선택도 잠근다
+      augmentCardsEl.querySelectorAll('.card-reroll').forEach((b) => { b.disabled = true; b.style.opacity = '0.35'; });
+      augmentCardsEl.querySelectorAll('.augment-card').forEach((cardEl, i) => {
+        if (i > 0) cardEl.querySelectorAll('.augment-pick').forEach((b) => { b.disabled = true; b.style.opacity = '0.4'; });
+      });
+      tutorialHighlightEl(firstCard, '5 / 6',
+        '이게 <b>증강</b>! <b>축복</b>(좋은 효과)과 <b>저주</b>(대가)가 함께 있어요.<br>강조된 <b>『강철 심장』</b>의 <b>✔ 선택</b> 버튼을 눌러보세요.', false);
+      const chosen = await pick;
+      augmentState.owned.push(chosen.id); // 보유 증강 패널에 보이도록 실제로 추가
+      renderOwnedAugments();
       tStep = 4;
-      // 선택 후에 증강이 무엇인지 설명 (증강 화면에 가려지지 않도록 선택 뒤 안내)
-      tutorialHighlight(null, '5 / 6',
-        `방금 <b>『${chosen.name}』</b> 증강을 골랐어요! ✨<br>카드를 진행하면 이렇게 <b>증강</b>을 골라 강해집니다. 강한 증강엔 <b>저주(대가)</b>가 따라요.`, true);
+      // 세트(학파) 설명 — 방금 고른 증강이 쌓인 '보유 증강' 패널을 강조
+      tutorialHighlight('.owned-panel', '6 / 6',
+        `방금 <b>『${chosen.name}』</b>이 여기 쌓였어요! 증강엔 <b>색(학파)</b>이 있고,<br>같은 색을 <b>2개 → 1단계 / 4개 → 2단계</b> 모으면 세트 효과가 발동해요.<br>🔴혈맹 · 🔵지혜 · 🟢생명 · 🟡황금 (자세한 건 📖 도감)`, true);
     }
     tutorialBusy = false;
-  }
-
-  function showSetExplain() {
-    tutorialHighlight(null, '6 / 6',
-      '증강마다 <b>색(학파)</b>이 있어요. 같은 색을 <b>2개 모으면 1단계</b>, <b>4개 모으면 2단계</b> 세트 효과가 발동해 훨씬 강해집니다.<br>🔴혈맹 · 🔵지혜 · 🟢생명 · 🟡황금 — 자세한 건 <b>📖 도감</b>에서!', true);
   }
 
   function showTutorialFinal() {
@@ -4328,9 +4356,8 @@
   }
 
   tutorialNextBtn.addEventListener('click', () => {
-    if (tStep === 4) { tStep = 5; showSetExplain(); }
-    else if (tStep === 5) { tStep = 6; showTutorialFinal(); }
-    else if (tStep >= 6) endTutorial();
+    if (tStep === 4) { tStep = 5; showTutorialFinal(); }
+    else if (tStep >= 5) endTutorial();
   });
   document.getElementById('tutorialSkip').addEventListener('click', endTutorial);
 
