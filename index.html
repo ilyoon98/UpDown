@@ -1397,7 +1397,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.4.5</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.5.0</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -3843,7 +3843,13 @@
     });
     if (augmentState.shopUnlocked !== true && shopUnlocked()) augmentState.shopUnlocked = true;
     const unlocked = augmentState.shopUnlocked === true;
-    shopBtn.style.display = unlocked ? '' : 'none';
+    // 상점 버튼은 항상 보이되, 개방 전엔 잠김 상태로 남은 자원 수를 안내
+    shopBtn.disabled = !unlocked;
+    if (unlocked) {
+      shopBtn.textContent = '🛒 상점 열기';
+    } else {
+      shopBtn.textContent = `🔒 상점 (자원 ${totalResources()}/${SHOP_OPEN_THRESHOLD})`;
+    }
     shopBtn.classList.toggle('affordable', unlocked && SHOP_ITEMS.some((it) => canBuy(it)));
   }
 
@@ -4023,11 +4029,16 @@
   // 시작 화면
   const startOverlay = document.getElementById('startOverlay');
   document.getElementById('startGameBtn').addEventListener('click', () => {
-    startOverlay.classList.remove('show');
     sfx('pick');
-    fx.confetti(30);
-    // 첫 플레이면 시작 화면을 닫은 뒤 튜토리얼 실행 (겹침 방지)
-    if (isFirstRun) setTimeout(startTutorial, 350);
+    if (isFirstRun) {
+      // 먼저 튜토리얼 보드(카드 2)를 세팅해 랜덤 카드가 잠깐 비치는 걸 막고,
+      // 그다음 시작 화면을 닫는다
+      startTutorial();
+      startOverlay.classList.remove('show');
+    } else {
+      startOverlay.classList.remove('show');
+      fx.confetti(30);
+    }
   });
 
   document.addEventListener('keydown', (e) => {
@@ -4062,6 +4073,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.0', notes: '상점 버튼 항상 표시(개방 전 잠김 안내) · 튜토리얼에 증강 선택 데모 추가 · 튜토 시작 시 랜덤 카드 깜빡임 제거 · 강조/감속은 첫 이동에만' },
     { v: 'v1.4.5', notes: '튜토리얼 — 카드 공개 후 1초 멈춤 + 이동 애니메이션 느리게(1.4초)로 잘 보이게' },
     { v: 'v1.4.4', notes: '튜토리얼 확장 — 카드 이동 중 카드 영역 강조 · 다운 체험 단계 추가(다운만 강조)' },
     { v: 'v1.4.3', notes: '튜토리얼 말풍선을 눌러야 할 버튼 바로 옆에 배치 · 업 버튼만 강조' },
@@ -4200,8 +4212,9 @@
     startGame();
   }
 
-  // 카드 공개 → (이동 중 카드 강조) → 왼쪽으로 이동 → 새 기준 카드 확정
-  async function tutorialRevealAndMove(card, win, msg) {
+  // 카드 공개 → 왼쪽으로 이동 → 새 기준 카드 확정.
+  // detailed=true(첫 이동)일 때만 멈춤+감속+카드 강조로 자세히 보여준다.
+  async function tutorialRevealAndMove(card, win, msg, detailed) {
     renderCard(nextCardEl, card);
     nextCardEl.classList.add(win ? 'glow-win' : 'glow-lose', 'flip');
     setMessage(msg, win ? 'win' : 'lose');
@@ -4213,11 +4226,15 @@
       fx.flash('rgba(230, 57, 70, 0.2)', 300);
       sfx('wrong');
     }
-    // 공개된 카드를 잠깐 보여준 뒤, 천천히 이동시키며 카드 영역을 강조
-    tutorialHighlight('.table', tutorialStepNo.textContent,
-      `오른쪽 카드가 <b>${card.number}</b>! 이 카드가 <b>왼쪽으로 이동</b>해 새 기준이 됩니다.`, false);
-    await new Promise((r) => setTimeout(r, 1000));
-    await flyToCurrent(1.4);
+    if (detailed) {
+      tutorialHighlight('.table', tutorialStepNo.textContent,
+        `오른쪽 카드가 <b>${card.number}</b>! 이 카드가 <b>왼쪽으로 이동</b>해 새 기준이 됩니다.`, false);
+      await new Promise((r) => setTimeout(r, 1000));
+      await flyToCurrent(1.4);
+    } else {
+      await new Promise((r) => setTimeout(r, 400));
+      await flyToCurrent();
+    }
     currentCard = card;
     renderCard(currentCardEl, currentCard);
     currentCardEl.style.opacity = '1';
@@ -4232,33 +4249,43 @@
     downBtn.disabled = true;
 
     if (tStep === 0) {
-      await tutorialRevealAndMove({ suit: 'green', label: '초록', number: 5 }, true, '정답! 5는 2보다 높죠 🎉');
+      await tutorialRevealAndMove({ suit: 'green', label: '초록', number: 5 }, true, '정답! 5는 2보다 높죠 🎉', true);
       tStep = 1;
-      tutorialHighlight('#upBtn', '2 / 4',
+      tutorialHighlight('#upBtn', '2 / 5',
         '좋아요! 이번엔 <b>일부러 틀려</b>볼게요. 지금 카드는 <b>5</b>.<br>다시 <b>▲ 업</b> 버튼을 눌러보세요.', false);
       upBtn.disabled = false;
     } else if (tStep === 1) {
-      await tutorialRevealAndMove({ suit: 'red', label: '빨강', number: 4 }, false, '앗! 4는 5보다 낮아요. 틀렸습니다!');
-      tutorialHighlight('#roulettePanel', '3 / 4',
+      await tutorialRevealAndMove({ suit: 'red', label: '빨강', number: 4 }, false, '앗! 4는 5보다 낮아요. 틀렸습니다!', false);
+      tutorialHighlight('#roulettePanel', '3 / 5',
         '틀리면 <b>러시안 룰렛</b>을 돌려요. 총알에 맞으면 게임 오버!<br>이번엔 튜토리얼이라 <b>안전하게</b> 살려드릴게요...', false);
       if (window.innerWidth <= 1100) roulettePanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await new Promise((r) => setTimeout(r, 600));
       await playRoulette(null, 1); // failNum 1 → 자비 곡선으로 무조건 생존
       tStep = 2;
       downBtn.disabled = false;
-      tutorialHighlight('#downBtn', '4 / 4',
+      tutorialHighlight('#downBtn', '4 / 5',
         '살았어요! 🍀 이번엔 <b>다운</b>이에요. 지금 카드는 <b>4</b>.<br>더 낮은 카드가 나올 것 같으면 이 <b>▼ 다운</b> 버튼을 눌러보세요.', false);
     } else if (tStep === 2) {
-      await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 1 }, true, '정답! 1은 4보다 낮죠 🎉');
+      await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 1 }, true, '정답! 1은 4보다 낮죠 🎉', false);
       tStep = 3;
+      // 증강 데모: 실제 선택 화면을 띄워 하나 골라보게 한다 (효과는 적용 안 함)
+      tutorialHighlight(null, '5 / 5',
+        '카드를 진행하면 <b>증강</b>을 골라 강해져요. 강한 증강엔 <b>저주(대가)</b>가 따르죠.<br>직접 하나 골라보세요!', false);
+      await new Promise((r) => setTimeout(r, 1400));
+      tutorialOverlay.classList.remove('show'); // 증강 화면이 보이도록 잠시 숨김
+      const demoIds = ['iron-heart', 'card-peek', 'gamblers-blood'];
+      const demoOpts = demoIds.map((id) => AUGMENTS.find((a) => a.id === id));
+      await showAugmentScreen(0, demoOpts); // 선택 결과는 무시 (데모)
+      tutorialOverlay.classList.add('show');
+      tStep = 4;
       tutorialHighlight(null, '완료 🎉',
-        '이제 다 배웠어요! 🍀 <b>업/다운을 맞히고 룰렛을 견디며 40장을 전부 넘기면 승리</b>예요.<br>색 카드로 자원을 모아 상점을 쓰고, 진행하며 증강도 골라보세요!', true);
+        '이제 다 배웠어요! 🍀 <b>업/다운을 맞히고 룰렛을 견디며 40장을 전부 넘기면 승리</b>예요.<br>색 카드로 자원을 모으면 <b>상점</b>도 열립니다. 행운을 빌어요!', true);
     }
     tutorialBusy = false;
   }
 
   tutorialNextBtn.addEventListener('click', () => {
-    if (tStep >= 3) endTutorial();
+    if (tStep >= 4) endTutorial();
   });
   document.getElementById('tutorialSkip').addEventListener('click', endTutorial);
 
