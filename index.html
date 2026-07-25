@@ -30,13 +30,14 @@
   }
   h1 { margin-bottom: 4px; }
   .version {
-    font-size: 13px;
-    font-weight: 700;
-    color: #999;
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffd166;
     background: #2a2a3c;
-    padding: 3px 10px;
-    border-radius: 999px;
-    vertical-align: middle;
+    border: 1px solid #55557a;
+    padding: 10px 14px;
+    border-radius: 8px;
+    align-self: center;
   }
 
   @keyframes hardShake {
@@ -1416,9 +1417,10 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.5.1</span></h1>
+<h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
+  <span class="version" id="versionTag">v1.5.2</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4092,6 +4094,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.2', notes: '버전 표시를 우측 상단으로 이동 · 튜토리얼에서 증강 반드시 선택 + 획득 피드백 · 세트(학파) 설명 단계 추가' },
     { v: 'v1.5.1', notes: '튜토리얼 — 다운 단계 4→3으로 근접 보너스 체험 · 완료 팝업 중앙 대형 강조(도전 카드 수 표시) · 완료 후 새 라운드 시작' },
     { v: 'v1.5.0', notes: '상점 버튼 항상 표시(개방 전 잠김 안내) · 튜토리얼에 증강 선택 데모 추가 · 튜토 시작 시 랜덤 카드 깜빡임 제거 · 강조/감속은 첫 이동에만' },
     { v: 'v1.4.5', notes: '튜토리얼 — 카드 공개 후 1초 멈춤 + 이동 애니메이션 느리게(1.4초)로 잘 보이게' },
@@ -4295,27 +4298,34 @@
     } else if (tStep === 2) {
       await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 3 }, true, '정답! 3은 4보다 낮죠 🎯 아슬아슬하게 맞혀 보너스!', false);
       tStep = 3;
-      // 증강 데모: 실제 선택 화면을 띄워 하나 골라보게 한다 (효과는 적용 안 함)
-      tutorialHighlight(null, '5 / 5',
-        '카드를 진행하면 <b>증강</b>을 골라 강해져요. 강한 증강엔 <b>저주(대가)</b>가 따르죠.<br>직접 하나 골라보세요!', false);
+      // 증강 데모: 실제 선택 화면을 띄워 하나 반드시 골라보게 한다
+      tutorialHighlight(null, '5 / 6',
+        '카드를 진행하면 <b>증강</b>을 골라 강해져요. 강한 증강엔 <b>저주(대가)</b>가 따르죠.<br>아래 셋 중 하나를 <b>반드시 골라보세요!</b>', false);
       await new Promise((r) => setTimeout(r, 1400));
       tutorialOverlay.classList.remove('show'); // 증강 화면이 보이도록 잠시 숨김
       const demoIds = ['iron-heart', 'card-peek', 'gamblers-blood'];
       const demoOpts = demoIds.map((id) => AUGMENTS.find((a) => a.id === id));
-      await showAugmentScreen(0, demoOpts); // 선택 결과는 무시 (데모)
+      const chosen = await showAugmentScreen(0, demoOpts);
       tutorialOverlay.classList.add('show');
       tStep = 4;
-      tutorialHighlight(null, '완료 🎉',
-        '이제 다 배웠어요! 🍀 <b>업/다운을 맞히고 룰렛을 견디며 카드를 전부 넘기면 승리</b>예요.<br><div class="tutorial-cards-left">40장 도전!</div>색 카드로 자원을 모으면 <b>상점</b>이 열리고, 진행하며 <b>증강</b>도 골라 강해지세요!', true);
-      tutorialBox.classList.add('final');
-      fx.confetti(70);
-      sfx('win');
+      // 세트(학파) 설명
+      tutorialHighlight(null, '6 / 6',
+        `<b>『${chosen.name}』</b> 획득! ✨<br><br>증강마다 <b>색(학파)</b>이 있어요. 같은 색을 <b>2개 모으면 1단계</b>, <b>4개 모으면 2단계</b> 세트 효과가 발동해 훨씬 강해집니다.<br>🔴혈맹 · 🔵지혜 · 🟢생명 · 🟡황금 — 자세한 건 <b>📖 도감</b>에서!`, true);
     }
     tutorialBusy = false;
   }
 
+  function showTutorialFinal() {
+    tutorialHighlight(null, '완료 🎉',
+      '이제 다 배웠어요! 🍀 <b>업/다운을 맞히고 룰렛을 견디며 카드를 전부 넘기면 승리</b>예요.<br><div class="tutorial-cards-left">40장 도전!</div>색 카드로 자원을 모으면 <b>상점</b>이 열립니다. 행운을 빌어요!', true);
+    tutorialBox.classList.add('final');
+    fx.confetti(70);
+    sfx('win');
+  }
+
   tutorialNextBtn.addEventListener('click', () => {
-    if (tStep >= 4) endTutorial();
+    if (tStep === 4) { tStep = 5; showTutorialFinal(); }
+    else if (tStep >= 5) endTutorial();
   });
   document.getElementById('tutorialSkip').addEventListener('click', endTutorial);
 
