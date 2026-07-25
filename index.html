@@ -1357,6 +1357,25 @@
   .tutorial-overlay { position: fixed; inset: 0; z-index: 6500; display: none; pointer-events: none; }
   .tutorial-overlay.show { display: block; }
   .tutorial-box { pointer-events: auto; }
+  /* 완료 팝업: 화면 중앙 대형 강조 */
+  .tutorial-box.final {
+    top: 50% !important;
+    bottom: auto !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(540px, 92vw);
+    padding: 32px 30px;
+    border-width: 2px;
+    box-shadow: 0 0 40px rgba(255, 209, 102, 0.4), 0 20px 50px rgba(0, 0, 0, 0.6);
+  }
+  .tutorial-box.final .tutorial-text { font-size: 18px; }
+  .tutorial-cards-left {
+    font-size: 46px;
+    font-weight: 900;
+    color: var(--gold);
+    text-shadow: 0 0 24px rgba(255, 209, 102, 0.6);
+    margin: 6px 0 14px;
+  }
   .tutorial-hole {
     position: fixed;
     border-radius: 14px;
@@ -1397,7 +1416,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.5.0</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.5.1</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -4073,6 +4092,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.1', notes: '튜토리얼 — 다운 단계 4→3으로 근접 보너스 체험 · 완료 팝업 중앙 대형 강조(도전 카드 수 표시) · 완료 후 새 라운드 시작' },
     { v: 'v1.5.0', notes: '상점 버튼 항상 표시(개방 전 잠김 안내) · 튜토리얼에 증강 선택 데모 추가 · 튜토 시작 시 랜덤 카드 깜빡임 제거 · 강조/감속은 첫 이동에만' },
     { v: 'v1.4.5', notes: '튜토리얼 — 카드 공개 후 1초 멈춤 + 이동 애니메이션 느리게(1.4초)로 잘 보이게' },
     { v: 'v1.4.4', notes: '튜토리얼 확장 — 카드 이동 중 카드 영역 강조 · 다운 체험 단계 추가(다운만 강조)' },
@@ -4192,6 +4212,7 @@
     tutorialMode = true;
     tStep = 0;
     tutorialBusy = false;
+    tutorialBox.classList.remove('final');
     document.body.classList.remove('finale');
     // 튜토리얼 보드: 현재 카드 2(파랑)로 세팅
     currentCard = { suit: 'blue', label: '파랑', number: 2 };
@@ -4222,6 +4243,12 @@
     if (win) {
       fx.burst(c.x, c.y, { count: 22, colors: ['#2a9d8f', '#5fd8c4', '#ffd166'], spread: 110 });
       sfx('correct');
+      // 근접 보너스: 현재 카드와 차이가 1~2면 추가 점수 안내
+      const diff = Math.abs(card.number - currentCard.number);
+      const close = diff === 1 ? 2 : diff === 2 ? 1 : 0;
+      if (close > 0) {
+        fx.float(c.x, c.y - 46, `🎯 근접 보너스 +${close}!`, '#ffd166', 24);
+      }
     } else {
       fx.flash('rgba(230, 57, 70, 0.2)', 300);
       sfx('wrong');
@@ -4264,9 +4291,9 @@
       tStep = 2;
       downBtn.disabled = false;
       tutorialHighlight('#downBtn', '4 / 5',
-        '살았어요! 🍀 이번엔 <b>다운</b>이에요. 지금 카드는 <b>4</b>.<br>더 낮은 카드가 나올 것 같으면 이 <b>▼ 다운</b> 버튼을 눌러보세요.', false);
+        '살았어요! 🍀 이번엔 <b>다운</b>이에요. 지금 카드는 <b>4</b>.<br>더 낮은 카드가 나올 것 같으면 이 <b>▼ 다운</b> 버튼을 눌러보세요. (차이가 작으면 <b>근접 보너스</b>!)', false);
     } else if (tStep === 2) {
-      await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 1 }, true, '정답! 1은 4보다 낮죠 🎉', false);
+      await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 3 }, true, '정답! 3은 4보다 낮죠 🎯 아슬아슬하게 맞혀 보너스!', false);
       tStep = 3;
       // 증강 데모: 실제 선택 화면을 띄워 하나 골라보게 한다 (효과는 적용 안 함)
       tutorialHighlight(null, '5 / 5',
@@ -4279,7 +4306,10 @@
       tutorialOverlay.classList.add('show');
       tStep = 4;
       tutorialHighlight(null, '완료 🎉',
-        '이제 다 배웠어요! 🍀 <b>업/다운을 맞히고 룰렛을 견디며 40장을 전부 넘기면 승리</b>예요.<br>색 카드로 자원을 모으면 <b>상점</b>도 열립니다. 행운을 빌어요!', true);
+        '이제 다 배웠어요! 🍀 <b>업/다운을 맞히고 룰렛을 견디며 카드를 전부 넘기면 승리</b>예요.<br><div class="tutorial-cards-left">40장 도전!</div>색 카드로 자원을 모으면 <b>상점</b>이 열리고, 진행하며 <b>증강</b>도 골라 강해지세요!', true);
+      tutorialBox.classList.add('final');
+      fx.confetti(70);
+      sfx('win');
     }
     tutorialBusy = false;
   }
