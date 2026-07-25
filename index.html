@@ -1351,6 +1351,36 @@
     padding-left: 4px;
   }
 
+  /* 튜토리얼 스포트라이트 */
+  .tutorial-overlay { position: fixed; inset: 0; z-index: 6500; display: none; }
+  .tutorial-overlay.show { display: block; }
+  .tutorial-hole {
+    position: fixed;
+    border-radius: 14px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.8);
+    border: 3px solid var(--gold);
+    pointer-events: none;
+    transition: all 0.35s cubic-bezier(.4,0,.2,1);
+  }
+  .tutorial-box {
+    position: fixed;
+    left: 50%;
+    bottom: 40px;
+    transform: translateX(-50%);
+    width: min(440px, 90vw);
+    background: #24243a;
+    border: 1px solid var(--gold);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    text-align: center;
+  }
+  .tutorial-step-no { font-size: 12px; font-weight: 800; color: var(--gold); margin-bottom: 6px; }
+  .tutorial-text { font-size: 15px; line-height: 1.6; color: #f0f0f0; margin-bottom: 14px; }
+  .tutorial-actions { display: flex; gap: 10px; justify-content: center; }
+  #tutorialSkip { background: #3a3a52; color: #bbb; padding: 9px 18px; font-size: 14px; }
+  #tutorialNext { background: var(--gold); color: #1e1e2e; padding: 9px 24px; font-size: 15px; }
+
   .fx-float {
     position: fixed;
     pointer-events: none;
@@ -1364,7 +1394,7 @@
 </head>
 <body>
 
-<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.3.1</span></h1>
+<h1>업다운 카드 게임 <span class="version" id="versionTag">v1.4.0</span></h1>
 
 <div class="top-utils">
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
@@ -1462,6 +1492,18 @@
 </div>
 
 <button type="button" class="peek-btn" id="peekBtn">👁 화면 잠깐 보기</button>
+
+<div class="tutorial-overlay" id="tutorialOverlay">
+  <div class="tutorial-hole" id="tutorialHole"></div>
+  <div class="tutorial-box" id="tutorialBox">
+    <div class="tutorial-step-no" id="tutorialStepNo"></div>
+    <div class="tutorial-text" id="tutorialText"></div>
+    <div class="tutorial-actions">
+      <button type="button" id="tutorialSkip">건너뛰기</button>
+      <button type="button" id="tutorialNext">다음 ▶</button>
+    </div>
+  </div>
+</div>
 
 <div class="codex-overlay" id="changelogOverlay">
   <div class="codex-modal">
@@ -1908,7 +1950,7 @@
       name: '미래 절취',
       tier: 2,
       color: 'blue',
-      good: '다음 카드를 보고 덱 맨 밑으로 보내기 (판당 2회)',
+      good: '다음 카드를 보지 않고 덱 맨 밑으로 보내기 (판당 2회)',
       bad: '획득 후 다음 실패 1회 총알 +1발 (1회성)',
       apply(s) { s.futureStealCharges += 2; s.pendingBulletBonus += 1; },
     },
@@ -2003,10 +2045,14 @@
   // 콤보 마일스톤: 콤보가 목표치에 도달하면 생존 보상으로 환급된다 (판당 1회씩)
   // 점수를 버는 모든 행동이 곧 "클리어를 위한 플레이"가 되도록 하는 장치.
   // ---------------------------------------------------------------------
+  // 콤보 마일스톤: 콤보(점수)를 생존 자원으로 환급 — 점수 증강이 곧 생존이 되게.
+  // 문턱을 낮게 잡아 콤보 계열 증강이 클리어에 실질 기여하도록 한다.
   const COMBO_MILESTONES = [
-    { at: 25, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
-    { at: 50, text: '🧹 총알 제거권 +1', tip: '다음 룰렛에서 총알이 1발 제거됩니다.', grant(s) { s.bulletRemovals += 1; } },
-    { at: 80, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
+    { at: 12, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
+    { at: 25, text: '🧹 총알 제거권 +1', tip: '다음 룰렛에서 총알이 1발 제거됩니다.', grant(s) { s.bulletRemovals += 1; } },
+    { at: 40, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
+    { at: 60, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
+    { at: 90, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
   ];
 
   function ownedColorCount(color) {
@@ -2109,7 +2155,7 @@
       greenGauge: 0,            // 생명 1단계: 초록 카드 정답 게이지 (4 → 방패 +1)
       autoReviveUsed: false,    // 생명 2단계: 판당 1회 사망 자동 무효 사용 여부
       deathImmunityCharges: 0,   // 죽음 면역 (상점/마일스톤)
-      milestonesClaimed: [false, false, false], // 콤보 마일스톤 달성 여부
+      milestonesClaimed: COMBO_MILESTONES.map(() => false), // 콤보 마일스톤 달성 여부
       bulletRemovals: 0,         // 총알 제거권: 다음 룰렛에서 총알 -1발
       // ---- 신규 증강 (P3) ----
       hasInsurance: false,       // 보험 계약: 룰렛마다 🟢 +2
@@ -2397,13 +2443,23 @@
   function renderProphecyHint() {
     if (augmentState.hasProphecy && deck.length > 0) {
       const top = deck[deck.length - 1];
-      // 기본 예언은 정보량이 낮은 3구간(넓고 모호). 지혜 2단계에서만
-      // 정확한 2분할(1~5 / 6~10)로 선명해진다.
+      // 기본 예언은 넓고 겹치는 범위(1~7 / 4~10)라 방향 감만 준다.
+      // 4~7 구간은 두 범위 어디든 속할 수 있어 확정이 어렵다.
+      // 지혜 2단계에서만 정확한 2분할(1~5 / 6~10)로 선명해진다.
       let group;
       if (setLevel('blue') >= 2) {
         group = top.number <= 5 ? '1~5' : '6~10';
       } else {
-        group = top.number <= 4 ? '낮은 편(1~4)' : top.number <= 6 ? '중간(5~6)' : '높은 편(7~10)';
+        // 겹치는 4~7 구간은 랜덤이지만, 같은 카드 동안에는 캐시해 깜빡임 방지
+        if (augmentState.prophecyCache && augmentState.prophecyCache.n === top.number
+            && augmentState.prophecyCache.deckLen === deck.length) {
+          group = augmentState.prophecyCache.g;
+        } else {
+          if (top.number <= 3) group = '1~7';
+          else if (top.number >= 8) group = '4~10';
+          else group = Math.random() < 0.5 ? '1~7' : '4~10';
+          augmentState.prophecyCache = { n: top.number, deckLen: deck.length, g: group };
+        }
       }
       prophecyHintEl.textContent = `🔮 다음 카드 예언: ${group}`;
       prophecyHintEl.style.display = 'block';
@@ -2459,18 +2515,16 @@
 
   const futureStealBtn = document.getElementById('futureStealBtn');
   futureStealBtn.addEventListener('click', () => {
-    if (peekActive || augmentState.futureStealCharges <= 0 || deck.length === 0) return;
+    if (augmentState.futureStealCharges <= 0 || deck.length <= 1) return;
     augmentState.futureStealCharges--;
-    const stolen = deck.pop();      // 맨 위(다음 카드) 꺼내서
-    deck.unshift(stolen);           // 맨 밑으로 보낸다
-    // 새로 올라온 다음 카드를 공개
-    peekActive = true;
-    const top = deck[deck.length - 1];
-    renderCard(nextCardEl, top);
-    nextCardEl.classList.add('peeked', 'flip');
+    const stolen = deck.pop();      // 다음 카드를 (보지 않고) 꺼내서
+    deck.unshift(stolen);           // 덱 맨 밑으로 보낸다
+    // 카드는 공개하지 않는다 — 새 다음 카드도 뒤집힌 채로 남는다
     const c = fx.centerOf(nextCardEl);
+    nextCardEl.classList.remove('flip'); void nextCardEl.offsetWidth;
+    nextCardEl.classList.add('flip');
     fx.burst(c.x, c.y, { count: 24, colors: ['#b45cd4', '#e0a7f0', '#fff'], spread: 120 });
-    fx.float(c.x, c.y - 60, `🕳 ${stolen.number} ${stolen.label} 카드를 덱 맨 밑으로!`, '#e0a7f0', 18);
+    fx.float(c.x, c.y - 60, '🕳 다음 카드를 덱 맨 밑으로!', '#e0a7f0', 18);
     refreshCardPeekUI();
     renderMemoryHint();
     renderProphecyHint();
@@ -2917,6 +2971,10 @@
   // countsForMercy=false + ignoreMercy=true → 광기의 축복 강제 룰렛.
   // 자비 카운터를 소비하지 않고, 자비 곡선도 무시하고 실확률로 발사한다.
   async function resolveRouletteEvent(countsForMercy = true, ignoreMercy = false) {
+    // 모바일(세로 배치)에서는 룰렛이 화면 밖이라 자동으로 스크롤
+    if (window.innerWidth <= 1100) {
+      roulettePanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     if (countsForMercy) augmentState.failEvents++;
     const failNum = augmentState.failEvents;
     const forced = consumeForcedBlock();
@@ -3919,7 +3977,8 @@
     Object.values(COLOR_SETS).forEach((set) => {
       const item = document.createElement('div');
       item.className = 'codex-item';
-      item.innerHTML = `<span class="cx-name">${set.icon} ${set.name} (${set.school})</span><span class="cx-desc"><span class="good">1단계:</span> ${set.t1}<br><span class="good">2단계:</span> ${set.t2}</span>`;
+      const t1 = set.t1.replace(/ · /g, '<br>&nbsp;&nbsp;• ');
+      item.innerHTML = `<span class="cx-name">${set.icon} ${set.name} (${set.school})</span><span class="cx-desc"><span class="good">1단계</span> — ${t1}<br><span class="good" style="color:#e0a7f0">2단계</span> — ${set.t2}</span>`;
       codexBody.appendChild(item);
     });
 
@@ -3986,6 +4045,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.4.0', notes: '첫 플레이 튜토리얼(단계별 강조) 추가 · 콤보 마일스톤 강화(12/25/40/60/90, 문턱↓·보상↑) · 예언 범위 확대(1~7 / 4~10 겹침) · 미래 절취는 카드 안 보고 뒤로 · 모바일 룰렛 자동 스크롤 · 세트 효과 도감 가독성 개선' },
     { v: 'v1.3.1', notes: '밸런스 — 확률의 눈 너프(상시 % → 충전형 5회 확인 버튼) · 흐릿한 예언 너프(정확한 1~5/6~10 → 모호한 3구간, 지혜 2단계에서만 정밀)' },
     { v: 'v1.3.0', notes: '기획서 P4 — 딜러의 최후(마지막 6장: 총알+1·콤보2배·붉은 톤다운 연출) · 첫 시도 오프닝(첫 증강 고정 3택: 강철 심장/카드 투시/도박사의 피) · 상점 중반 개방(P1에 반영됨)' },
     { v: 'v1.2.0', notes: '기획서 P3 — 신규 증강 8종 추가(보험 계약·중용의 길·미래 절취·전율 중독·곡예사·역배당·오뚝이·연금술사). 총 28종, 색 7·7·7·7 균형. 미래 절취 버튼·오뚝이 콤보2배 등 신규 UI 반영' },
@@ -4045,9 +4105,66 @@
     if (document.visibilityState === 'visible') checkForUpdate();
   });
 
+  // ---------------------------------------------------------------------
+  // 튜토리얼: 첫 플레이 시 주요 UI를 단계별로 강조하며 설명
+  // ---------------------------------------------------------------------
+  const TUTORIAL_STEPS = [
+    { sel: '.table', text: '왼쪽은 현재 카드, 오른쪽은 다음에 뒤집힐 카드예요. 다음 카드가 <b>더 높을지 낮을지</b> 맞히는 게임입니다.' },
+    { sel: '.controls', text: '<b>업(높다)</b> / <b>다운(낮다)</b>을 선택하세요. 키보드 <b>↑ ↓</b> 로도 할 수 있어요.' },
+    { sel: '#roulettePanel', text: '틀리면 <b>러시안 룰렛</b>! 총알에 맞으면 게임 오버예요. (초반 몇 번은 봐줍니다 🍀)' },
+    { sel: '#deckProgress', text: '카드를 진행하면 <b>표시된 지점</b>에서 증강을 골라 강해집니다. 강한 증강엔 대가(저주)가 따라요.' },
+    { sel: '.resource-bar', text: '색 카드를 맞히면 여기에 <b>자원</b>이 쌓여요. 자원이 모이면 <b>상점</b>이 열려 아이템을 살 수 있습니다.' },
+    { sel: null, text: '목표는 딱 하나 — <b>40장을 전부 넘기면 승리!</b> 행운을 빕니다 🍀' },
+  ];
+  const tutorialOverlay = document.getElementById('tutorialOverlay');
+  const tutorialHole = document.getElementById('tutorialHole');
+  const tutorialBox = document.getElementById('tutorialBox');
+  const tutorialText = document.getElementById('tutorialText');
+  const tutorialStepNo = document.getElementById('tutorialStepNo');
+  let tutorialIdx = 0;
+
+  function showTutorialStep(i) {
+    const step = TUTORIAL_STEPS[i];
+    tutorialStepNo.textContent = `${i + 1} / ${TUTORIAL_STEPS.length}`;
+    tutorialText.innerHTML = step.text;
+    document.getElementById('tutorialNext').textContent = i === TUTORIAL_STEPS.length - 1 ? '시작하기 ✔' : '다음 ▶';
+    const el = step.sel ? document.querySelector(step.sel) : null;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const pad = 8;
+      tutorialHole.style.display = 'block';
+      tutorialHole.style.left = (r.left - pad) + 'px';
+      tutorialHole.style.top = (r.top - pad) + 'px';
+      tutorialHole.style.width = (r.width + pad * 2) + 'px';
+      tutorialHole.style.height = (r.height + pad * 2) + 'px';
+      // 말풍선이 강조 영역과 겹치면 위/아래로 피한다
+      tutorialBox.style.bottom = r.bottom > window.innerHeight * 0.6 ? 'auto' : '40px';
+      tutorialBox.style.top = r.bottom > window.innerHeight * 0.6 ? '30px' : 'auto';
+    } else {
+      tutorialHole.style.display = 'none';
+      tutorialBox.style.bottom = '40px';
+      tutorialBox.style.top = 'auto';
+    }
+  }
+  function startTutorial() {
+    tutorialIdx = 0;
+    tutorialOverlay.classList.add('show');
+    showTutorialStep(0);
+  }
+  function endTutorial() {
+    tutorialOverlay.classList.remove('show');
+  }
+  document.getElementById('tutorialNext').addEventListener('click', () => {
+    tutorialIdx++;
+    if (tutorialIdx >= TUTORIAL_STEPS.length) endTutorial();
+    else showTutorialStep(tutorialIdx);
+  });
+  document.getElementById('tutorialSkip').addEventListener('click', endTutorial);
+
   buildCardGrid();
   buildCylinder();
   startGame();
+  if (isFirstRun) setTimeout(startTutorial, 400);
 </script>
 
 </body>
