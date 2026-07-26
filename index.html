@@ -1433,7 +1433,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.6.0</span>
+  <span class="version" id="versionTag">v1.6.1</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -3414,6 +3414,8 @@
     streak = 0;
     runBest = 0;
     peekActive = false;
+    oddsRevealed = false;
+    rouletteBusy = false;
     resultOverlay.classList.remove('show');
     augmentState = createInitialAugmentState();
     revealCurrentCard(currentCard); // 뒷면 → 뒤집혀 등장
@@ -4119,6 +4121,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.6.1', notes: '새 게임 시 확률의 눈 표시·룰렛 상태 초기화 누락 수정' },
     { v: 'v1.6.0', notes: '튜토리얼 — 카드 이동·근접 보너스 구간을 자동 진행 대신 다음 버튼 클릭으로, 다음 버튼 강조(펄스)' },
     { v: 'v1.5.9', notes: '첫 카드 등장 연출 — 시작 화면 중엔 뒷면, 게임/튜토 시작 시 뒤집혀 공개(랜덤 카드가 튀던 문제 해결)' },
     { v: 'v1.5.8', notes: '튜토리얼 다듬기 — 업/다운 글씨 색 강조 · 카드 구성(1~10·4색·40장) 설명 · 2단계 문구 완화 · 근접 보너스 강조 단계 추가 · 완료 요약에 카드 설명' },
