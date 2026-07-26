@@ -1433,7 +1433,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.5.7</span>
+  <span class="version" id="versionTag">v1.5.8</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4107,6 +4107,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.8', notes: '튜토리얼 다듬기 — 업/다운 글씨 색 강조 · 카드 구성(1~10·4색·40장) 설명 · 2단계 문구 완화 · 근접 보너스 강조 단계 추가 · 완료 요약에 카드 설명' },
     { v: 'v1.5.7', notes: '튜토리얼 완료 팝업에 규칙 요약(업다운·룰렛·자원/상점·증강/세트) 추가' },
     { v: 'v1.5.6', notes: '튜토리얼 글씨 키우고 문장 쉽게 · 건너뛰기하면 증강 화면까지 닫고 새 게임 시작' },
     { v: 'v1.5.5', notes: '튜토리얼 증강 단계 개선 — 증강 화면 위에 설명 팝업이 함께 뜨고 첫 카드만 강조·선택 가능, 세트 설명은 보유 증강 패널을 강조' },
@@ -4266,7 +4267,7 @@
     downBtn.disabled = true; // 튜토리얼은 업만 사용
     tutorialOverlay.classList.add('show');
     tutorialHighlight('#upBtn', '1 / 6',
-      '지금 카드는 <b>2</b>예요.<br>다음 카드가 <b>2보다 클까요?</b><br>크다고 생각하면 <b>▲ 업</b>을 눌러요!', false);
+      '카드는 <b>1~10</b>이 <b>4가지 색</b>으로 <b>총 40장</b> 있어요.<br>지금 카드는 <b>2</b>! 다음 카드가 더 클 것 같으면<br><b style="color:#4fd6c0">▲ 업</b>을 눌러보세요!', false);
   }
 
   function endTutorial() {
@@ -4325,7 +4326,7 @@
       await tutorialRevealAndMove({ suit: 'green', label: '초록', number: 5 }, true, '정답! 5는 2보다 높죠 🎉', true);
       tStep = 1;
       tutorialHighlight('#upBtn', '2 / 6',
-        '맞았어요! 👍<br>이번엔 <b>일부러 틀려</b>볼게요.<br>다시 <b>▲ 업</b>을 눌러요.', false);
+        '맞았어요! 👍<br>다시 한 번 <b style="color:#4fd6c0">▲ 업</b>을 눌러보세요.', false);
       upBtn.disabled = false;
     } else if (tStep === 1) {
       await tutorialRevealAndMove({ suit: 'red', label: '빨강', number: 4 }, false, '앗! 4는 5보다 낮아요. 틀렸습니다!', false);
@@ -4337,9 +4338,13 @@
       tStep = 2;
       downBtn.disabled = false;
       tutorialHighlight('#downBtn', '4 / 6',
-        '살았어요! 🍀<br>지금 카드는 <b>4</b>. 다음이 <b>더 작을 것 같으면</b><br><b>▼ 다운</b>을 눌러요!', false);
+        '살았어요! 🍀<br>지금 카드는 <b>4</b>. 다음이 더 작을 것 같으면<br><b style="color:#ff8a8a">▼ 다운</b>을 눌러보세요!', false);
     } else if (tStep === 2) {
       await tutorialRevealAndMove({ suit: 'yellow', label: '노랑', number: 3 }, true, '정답! 3은 4보다 낮죠 🎯 아슬아슬하게 맞혀 보너스!', false);
+      // 근접 보너스 강조 (카드 아래 메시지를 짚어준다)
+      tutorialHighlight('.message', '4 / 6',
+        '🎯 <b>근접 보너스!</b><br>가까운 숫자(차이 1~2)를 맞히면<br><b>추가 점수</b>를 받아요!', false);
+      await new Promise((r) => setTimeout(r, 2000));
       tStep = 3;
       // 증강 화면을 띄우되 튜토리얼 오버레이는 유지 — 첫 카드를 강조하며 설명한다
       const demoIds = ['iron-heart', 'card-peek', 'gamblers-blood'];
@@ -4371,6 +4376,7 @@
       '이제 다 배웠어요! 🍀<br><b>카드를 전부 넘기면 승리!</b>'
       + '<div class="tutorial-cards-left">40장 도전!</div>'
       + '<div class="tutorial-summary">'
+      + '<div>🃏 카드는 <b>1~10</b>, <b>4가지 색</b>, 총 <b>40장</b></div>'
       + '<div>▲▼ <b>업/다운</b>으로 다음 카드 맞히기</div>'
       + '<div>🔫 틀리면 <b>룰렛</b> — 총알 조심!</div>'
       + '<div>🎨 색 카드로 <b>자원</b> 모아 🛒 상점 이용</div>'
