@@ -1377,6 +1377,18 @@
     text-shadow: 0 0 24px rgba(255, 209, 102, 0.6);
     margin: 6px 0 14px;
   }
+  .tutorial-summary {
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #3a3a52;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: 4px 0 16px;
+    font-size: 16px;
+    line-height: 1.9;
+    color: #d8d8e0;
+  }
+  .tutorial-summary b { color: #ffe9b3; }
   .tutorial-hole {
     position: fixed;
     border-radius: 14px;
@@ -1421,7 +1433,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.5.6</span>
+  <span class="version" id="versionTag">v1.5.7</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4095,6 +4107,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.5.7', notes: '튜토리얼 완료 팝업에 규칙 요약(업다운·룰렛·자원/상점·증강/세트) 추가' },
     { v: 'v1.5.6', notes: '튜토리얼 글씨 키우고 문장 쉽게 · 건너뛰기하면 증강 화면까지 닫고 새 게임 시작' },
     { v: 'v1.5.5', notes: '튜토리얼 증강 단계 개선 — 증강 화면 위에 설명 팝업이 함께 뜨고 첫 카드만 강조·선택 가능, 세트 설명은 보유 증강 패널을 강조' },
     { v: 'v1.5.4', notes: '튜토리얼 — 증강을 먼저 고르게 하고 그 뒤에 설명 팝업(증강 화면에 안내가 가려지던 문제 해결)' },
@@ -4355,7 +4368,15 @@
 
   function showTutorialFinal() {
     tutorialHighlight(null, '완료 🎉',
-      '이제 다 배웠어요! 🍀<br><b>카드를 전부 넘기면 승리!</b><div class="tutorial-cards-left">40장 도전!</div>행운을 빌어요 😊', true);
+      '이제 다 배웠어요! 🍀<br><b>카드를 전부 넘기면 승리!</b>'
+      + '<div class="tutorial-cards-left">40장 도전!</div>'
+      + '<div class="tutorial-summary">'
+      + '<div>▲▼ <b>업/다운</b>으로 다음 카드 맞히기</div>'
+      + '<div>🔫 틀리면 <b>룰렛</b> — 총알 조심!</div>'
+      + '<div>🎨 색 카드로 <b>자원</b> 모아 🛒 상점 이용</div>'
+      + '<div>✨ <b>증강</b>을 골라 강해지기 (같은 색 = 세트)</div>'
+      + '</div>'
+      + '행운을 빌어요 😊', true);
     tutorialBox.classList.add('final');
     fx.confetti(70);
     sfx('win');
