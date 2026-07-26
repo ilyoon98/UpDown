@@ -1449,7 +1449,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.7.2</span>
+  <span class="version" id="versionTag">v1.8.0</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -1818,7 +1818,7 @@
       color: 'green',
       good: '실패 1회는 룰렛을 돌리지 않음 (1회용 방패)',
       bad: '없음',
-      apply(s) { s.shieldCharges += 1; },
+      apply(s) { grantProtection('shield'); },
     },
     {
       id: 'odds-eye',
@@ -1836,7 +1836,7 @@
       color: 'green',
       good: '실패해도 연속 성공 기록 유지 (1회)',
       bad: '없음',
-      apply(s) { s.comboGuardCharges += 1; },
+      apply(s) { grantProtection('record'); },
     },
 
     {
@@ -1883,8 +1883,8 @@
       tier: 2,
       color: 'blue',
       good: '다음 카드의 대략적 구간(낮음/중간/높음) 표시 · 지혜 2단계에서 정밀해짐',
-      bad: '실패 시 방아쇠를 2회 당김',
-      apply(s) { s.hasProphecy = true; },
+      bad: '획득 후 다음 실패 1회 총알 +1발 (1회성)',
+      apply(s) { s.hasProphecy = true; s.pendingBulletBonus += 1; },
     },
     {
       id: 'survival-instinct',
@@ -2104,11 +2104,11 @@
   // 콤보 마일스톤: 콤보(점수)를 생존 자원으로 환급 — 점수 증강이 곧 생존이 되게.
   // 문턱을 낮게 잡아 콤보 계열 증강이 클리어에 실질 기여하도록 한다.
   const COMBO_MILESTONES = [
-    { at: 12, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
-    { at: 25, text: '🧹 총알 제거권 +1', tip: '다음 룰렛에서 총알이 1발 제거됩니다.', grant(s) { s.bulletRemovals += 1; } },
-    { at: 40, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant(s) { s.shieldCharges += 1; } },
-    { at: 60, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
-    { at: 90, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant(s) { s.deathImmunityCharges += 1; } },
+    { at: 12, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant() { grantProtection('shield'); } },
+    { at: 25, text: '🧹 총알 제거권 +1', tip: '다음 룰렛에서 총알이 1발 제거됩니다.', grant() { grantProtection('remove'); } },
+    { at: 40, text: '🛡 룰렛 방패 +1', tip: '실패 1회를 룰렛 없이 넘깁니다.', grant() { grantProtection('shield'); } },
+    { at: 60, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant() { grantProtection('immunity'); } },
+    { at: 90, text: '🔴 죽음 면역 +1', tip: '어떤 죽음이든(즉사 포함) 1회 무효화합니다.', grant() { grantProtection('immunity'); } },
   ];
 
   function ownedColorCount(color) {
@@ -2116,6 +2116,30 @@
       const a = AUGMENTS.find((x) => x.id === id);
       return a && a.color === color;
     }).length;
+  }
+
+  // 보호류 지급 통합 헬퍼. 방패/면역/기록보호/총알제거권을 얻는 모든 경로(상점·마일스톤·증강)가
+  // 이 함수를 거치게 해서, 생명(초록) 1단계 '보호류 획득 시 50% +1'을 한 곳에서 일관되게 판정한다.
+  // kind: 'shield' | 'immunity' | 'record' | 'remove'
+  const PROTECTION_KINDS = {
+    shield:   { field: 'shieldCharges',        label: '🛡 방패' },
+    immunity: { field: 'deathImmunityCharges', label: '🔴 죽음 면역' },
+    record:   { field: 'comboGuardCharges',    label: '📌 기록 보호' },
+    remove:   { field: 'bulletRemovals',       label: '🧹 총알 제거권' },
+  };
+  function grantProtection(kind, amount = 1) {
+    const info = PROTECTION_KINDS[kind];
+    if (!info) return;
+    augmentState[info.field] += amount;
+    // 생명 1단계: 지급 1건당 50% 확률로 +1
+    if (setLevel('green') >= 1) {
+      let bonus = 0;
+      for (let i = 0; i < amount; i++) if (Math.random() < 0.5) bonus++;
+      if (bonus > 0) {
+        augmentState[info.field] += bonus;
+        fx.float(window.innerWidth / 2, window.innerHeight / 2 - 40, `🟢 생명 — ${info.label} +${bonus} 보너스!`, '#5fd8c4', 20);
+      }
+    }
   }
 
   // 증강 획득 후 호출: 세트 레벨이 오르면 축하 연출.
@@ -2529,11 +2553,12 @@
   let peekActive = false; // 이번 턴에 이미 투시했는지 (중복 소모 방지)
 
   function refreshCardPeekUI() {
-    const show = augmentState.hasCardPeek && augmentState.peekCharges > 0 && !isFinale();
+    // 딜러의 최후에도 사용 가능: 아껴둔 충전형 소모품(투시·절취)은 빌드 존중 차원에서 차단하지 않는다.
+    const show = augmentState.hasCardPeek && augmentState.peekCharges > 0;
     cardPeekBtn.textContent = `🔍 다음 카드 확인 (${augmentState.peekCharges}회)`;
     cardPeekBtn.classList.toggle('show', show && !peekActive);
-    // 미래 절취 버튼
-    const fsShow = augmentState.futureStealCharges > 0 && deck.length > 0 && !isFinale();
+    // 미래 절취 버튼 (딜러의 최후에도 사용 가능)
+    const fsShow = augmentState.futureStealCharges > 0 && deck.length > 0;
     futureStealBtn.textContent = `🕳 미래 절취 (${augmentState.futureStealCharges}회)`;
     futureStealBtn.classList.toggle('show', fsShow && !peekActive);
   }
@@ -2674,7 +2699,7 @@
     if (s.phoenixCharges > 0) items.push({ cls: 'buff', text: `🕊 불사조: 사망 시 50% 부활 (${s.phoenixCharges}회)`, tip: '사망이 확정되는 순간 50% 확률로 부활합니다. 부활에 성공하면 그 대가로 영구 총알이 +1발 늘어납니다.' });
     if (s.tieIsWin) items.push({ cls: 'buff', text: '🃏 독심술: 동점도 정답 처리', tip: '같은 숫자가 나와도 무승부가 아니라 정답으로 처리됩니다.' });
     if (s.streakBonus > 0) items.push({ cls: 'buff', text: `⚡ 정답당 콤보 +${1 + s.streakBonus} (기본 1+${s.streakBonus})`, tip: '증강 효과로 정답 1회마다 콤보를 추가로 얻습니다. 근접/색상 보너스는 여기에 또 더해집니다.' });
-    if (s.pendingBulletBonus > 0) items.push({ cls: 'debuff', text: `⚠ 다음 실패: 총알 +${s.pendingBulletBonus}발 (1회성)`, tip: '다음 실패 1회에만 룰렛에 총알이 추가로 장전됩니다. 한 번 발동하면 사라집니다.' });
+    if (s.pendingBulletBonus > 0) items.push({ cls: 'debuff', text: `⚠ 1회성 총알 저주 ${s.pendingBulletBonus}발 (실패마다 1발씩)`, tip: '실패할 때마다 룰렛에 총알이 1발씩 추가로 장전되고, 그만큼 이 수치가 줄어듭니다. 여러 개가 쌓여도 한 번에 몰아 터지지 않습니다.' });
     if (s.bulletCurses > 0) items.push({ cls: 'debuff', text: `☠ 영구 저주: 실패 시 총알 +${s.bulletCurses}발`, tip: '증강의 저주가 쌓여, 실패할 때마다 룰렛에 총알이 기본 1발 + 저주만큼 장전됩니다. 이번 판 내내 유지됩니다.' });
     if (s.forcedRouletteEvery) {
       const left = s.forcedRouletteEvery - (s.correctCount % s.forcedRouletteEvery);
@@ -2911,9 +2936,10 @@
     // 표시용 총알 수 (실린더는 항상 6챔버)
     let bullets = 1 + augmentState.bulletCurses;
     if (forced && forced.doubleVisual) bullets = Math.max(bullets, 2);
+    // 1회성 총알 저주는 실패 1회당 1발씩만 소모 — 여러 개 쌓여도 한 번에 몰아 터지지 않게(스파이크 방지). 남은 건 다음 실패로 이월.
     if (!forced && augmentState.pendingBulletBonus > 0) {
-      bullets += augmentState.pendingBulletBonus;
-      augmentState.pendingBulletBonus = 0;
+      bullets += 1;
+      augmentState.pendingBulletBonus -= 1;
     }
     // 딜러의 최후: 마지막 6장 구간은 총알 +1 (강제 결과 제외)
     if (!forced && isFinale()) bullets += 1;
@@ -3051,7 +3077,7 @@
     const failNum = augmentState.failEvents;
     const forced = consumeForcedBlock();
     let pulls = 1;
-    if (augmentState.hasProphecy) pulls++;
+    // 흐릿한 예언(v1.8.0): 저주를 '획득 후 첫 실패 총알 +1'(pendingBulletBonus)로 이관 — 방아쇠 2회 저주 제거
     if (augmentState.hasGamblersBlood) pulls++;
     if (augmentState.perfectMemoryExtraPull) pulls++; // 완벽한 기억 저주
     if (augmentState.hasThrill) pulls++;              // 전율 중독 저주
@@ -3544,7 +3570,7 @@
       fx.flash('rgba(180, 30, 40, 0.4)', 700);
       fx.shake(true);
       fx.float(window.innerWidth / 2, window.innerHeight / 2 - 60, '🎭 마지막 6장 — 딜러가 웃고 있다', '#ff5c5c', 30);
-      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 18, '🔒 모든 정보가 차단됩니다', '#ff9d9d', 18);
+      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 18, '🔒 시야가 차단됩니다 — 아껴둔 투시·절취만 통합니다', '#ff9d9d', 18);
       sfx('death');
     }
     // 연금술사: 10장 진행마다 전 색 자원 +1 (이자)
@@ -3576,6 +3602,7 @@
       let closeBonus = isTie ? 0 : diff === 1 ? 2 : diff === 2 ? 1 : 0;
       if (closeBonus > 0 && augmentState.hasAcrobat) closeBonus *= 2;
       let gain = 1 + augmentState.streakBonus + closeBonus;
+      let redCardConnectBonus = 0; // 혈맹 1단계 '빨강 카드 +1'분 — 콤보 보너스 판정에서 제외해 자기 재트리거 방지
       const colorFloats = []; // [텍스트, 색상]
 
       // ---- 색상 자원 획득 (뒤집힌 카드의 색 기준) ----
@@ -3601,6 +3628,7 @@
       // ---- 세트 1단계: 카드 색 연결 (해당 색 카드 정답 시 강화) ----
       if (col === 'red' && setLevel('red') >= 1) {
         gain += 1;
+        redCardConnectBonus = 1;
         colorFloats.push(['🔴 혈맹 — 빨강 카드 +1', '#ff7b7b']);
       }
       if (col === 'yellow' && setLevel('yellow') >= 1) {
@@ -3685,8 +3713,9 @@
         colorFloats.push([`🛟 오뚝이 — 콤보 2배! (${augmentState.comebackCharges}회 남음)`, '#5fd8c4']);
       }
 
-      // 혈맹 1단계: 이번 정답에 콤보 보너스가 하나라도 붙었으면 +1
-      if (setLevel('red') >= 1 && gain > 1 + augmentState.streakBonus) {
+      // 혈맹 1단계: 이번 정답에 (빨강 카드 +1을 제외한) 콤보 보너스가 하나라도 붙었으면 +1
+      // redCardConnectBonus를 빼서 '빨강 카드 +1'이 스스로 이 보너스를 재트리거하는 걸 막는다.
+      if (setLevel('red') >= 1 && gain - redCardConnectBonus > 1 + augmentState.streakBonus) {
         gain += 1;
         colorFloats.push(['🔴 혈맹 — 콤보 보너스 +1', '#ff7b7b']);
       }
@@ -3853,12 +3882,12 @@
   // 같은 아이템을 살 때마다 가격이 +1(색 하나)씩 오른다(§6).
   const SHOP_ITEMS = [
     { id: 'peek', name: '🔍 카드 투시 +1', desc: '다음 카드를 미리 확인 (1회)', base: { blue: 2 }, buy(s) { s.hasCardPeek = true; s.peekCharges += 1; } },
-    { id: 'shield', name: '🛡 룰렛 방패 +1', desc: '실패 1회를 룰렛 없이 넘김', base: { green: 2 }, buy(s) { s.shieldCharges += 1; } },
+    { id: 'shield', name: '🛡 룰렛 방패 +1', desc: '실패 1회를 룰렛 없이 넘김', base: { green: 2 }, buy(s) { grantProtection('shield'); } },
     { id: 'reroll', name: '🔄 리롤 +1', desc: '증강 선택 시 카드 교체 1회', base: { yellow: 2 }, buy(s) { s.rerollCharges += 1; } },
     { id: 'heat', name: '🔥 열기', desc: '다음 정답 3회 콤보 2배', base: { red: 2 }, buy(s) { s.heatCharges += 3; } },
-    { id: 'remove', name: '🧹 총알 제거권 +1', desc: '다음 룰렛에서 총알 -1발', base: { blue: 1, green: 1 }, buy(s) { s.bulletRemovals += 1; } },
+    { id: 'remove', name: '🧹 총알 제거권 +1', desc: '다음 룰렛에서 총알 -1발', base: { blue: 1, green: 1 }, buy(s) { grantProtection('remove'); } },
     { id: 'cleanse', name: '🧪 정화', desc: '영구 총알 저주 1개 제거', base: { red: 1, blue: 1, green: 1, yellow: 1 }, stock: 2, buy(s) { s.bulletCurses = Math.max(0, s.bulletCurses - 1); } },
-    { id: 'immunity', name: '💠 죽음 면역 +1', desc: '어떤 죽음이든 1회 무효 (검은 계약 즉사 제외)', base: { red: 1, blue: 1, green: 1, yellow: 1 }, stock: 1, buy(s) { s.deathImmunityCharges += 1; } },
+    { id: 'immunity', name: '💠 죽음 면역 +1', desc: '어떤 죽음이든 1회 무효 (검은 계약 즉사 제외)', base: { red: 1, blue: 1, green: 1, yellow: 1 }, stock: 1, buy(s) { grantProtection('immunity'); } },
   ];
 
   // 상점 개방: 총 자원 6개 이상 모이면 열린다(§6 — 첫 판 정보 과부하 방지)
@@ -3977,13 +4006,7 @@
     if (item.stock !== undefined) {
       augmentState.shopStock[item.id] = (augmentState.shopStock[item.id] || 0) + 1;
     }
-    item.buy(augmentState);
-    // 생명 1단계: 보호류(방패·면역) 구매 시 50% 확률로 +1
-    if (setLevel('green') >= 1 && (item.id === 'shield' || item.id === 'immunity') && Math.random() < 0.5) {
-      if (item.id === 'shield') augmentState.shieldCharges += 1;
-      else augmentState.deathImmunityCharges += 1;
-      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 40, '🟢 생명 — 보호 +1 보너스!', '#5fd8c4', 20);
-    }
+    item.buy(augmentState); // 보호류(방패·면역·총알 제거권)는 grantProtection이 생명 1단계 50% +1까지 처리
     sfx('pick');
     fx.float(window.innerWidth / 2, window.innerHeight / 2 - 80, `${item.name} 구매!`, '#ffd166', 24);
     renderShop();
@@ -4157,6 +4180,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.8.0', notes: '밸런스/버그 묶음 — 딜러의 최후 시야 차단을 패시브(기억/예언/확률)만으로 완화하고 아껴둔 투시·절취는 사용 가능 · 혈맹 1단계 빨강 카드 +1 자기 재트리거 버그 수정 · 흐릿한 예언 저주를 방아쇠 2회 → 1회성 총알 +1로 재가격 · 1회성 총알 저주를 실패당 1발씩 분할 소모(스파이크 방지) · 생명 1단계 보호류 +1을 마일스톤·증강 획득까지 통일 적용' },
     { v: 'v1.7.2', notes: '사용 효과 버튼(투시·미래절취·확률)이 여러 개일 때 겹치던 문제 수정 — 세로 정렬' },
     { v: 'v1.7.1', notes: '튜토리얼 완료 팝업 텍스트·요약 글씨 크게' },
     { v: 'v1.7.0', notes: '개선 묶음 — 상점 개방 연출 · 활성 효과 패널 스크롤+위험 우선 정렬 · 한 정답 콤보 상한(폭주 방지) · 무승부 연출 강화 · 딜러의 최후(마지막 6장) 정보 전면 차단(기억/예언/투시/확률/절취)' },
