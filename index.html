@@ -30,14 +30,15 @@
   }
   h1 { margin-bottom: 4px; }
   .version {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 800;
     color: #ffd166;
     background: #2a2a3c;
     border: 1px solid #55557a;
-    padding: 10px 14px;
+    padding: 13px 16px;
     border-radius: 8px;
     align-self: center;
+    line-height: 24px; /* 버튼(#restartBtn 등) 내용 높이와 일치시켜 카드 크기를 맞춤 */
   }
 
   @keyframes hardShake {
@@ -1174,9 +1175,28 @@
   /* 모바일: 본 게임 화면 축소 */
   @media (max-width: 600px) {
     body { padding: 12px; }
-    h1 { font-size: 22px; margin-top: 46px; }
-    .top-utils { top: 10px; right: 10px; gap: 6px; }
-    #restartBtn, #codexBtn { padding: 9px 14px; font-size: 13px; }
+    h1 { font-size: 22px; margin-top: 4px; }
+    /* 모바일: 고정 배치 대신 문서 흐름 상단으로 옮겨 헤더와 겹치지 않게 + 줄바꿈 허용 */
+    .top-utils {
+      position: static;
+      order: -1;
+      width: 100%;
+      top: auto; right: auto;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    /* id 셀렉터 특이성을 넘기려 .top-utils 접두로 명시 — 버튼·버전 카드 크기 통일 */
+    .top-utils #restartBtn,
+    .top-utils #codexBtn,
+    .top-utils #helpBtn,
+    .top-utils #changelogBtn,
+    .top-utils .version {
+      font-size: 12px;
+      padding: 9px 12px;
+      border-radius: 8px;
+    }
     .stats { gap: 14px; font-size: 15px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; }
     .table { gap: 14px; margin-bottom: 20px; }
     .arrow { font-size: 22px; }
@@ -1449,7 +1469,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.8.0</span>
+  <span class="version" id="versionTag">v1.8.1</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4180,6 +4200,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.8.1', notes: '모바일 상단 버튼이 헤더와 겹치던 문제 수정 — 상단 유틸을 문서 흐름 상단으로 옮기고 줄바꿈 허용 · 버전 카드를 다른 버튼과 동일한 크기로 통일(모바일·데스크톱)' },
     { v: 'v1.8.0', notes: '밸런스/버그 묶음 — 딜러의 최후 시야 차단을 패시브(기억/예언/확률)만으로 완화하고 아껴둔 투시·절취는 사용 가능 · 혈맹 1단계 빨강 카드 +1 자기 재트리거 버그 수정 · 흐릿한 예언 저주를 방아쇠 2회 → 1회성 총알 +1로 재가격 · 1회성 총알 저주를 실패당 1발씩 분할 소모(스파이크 방지) · 생명 1단계 보호류 +1을 마일스톤·증강 획득까지 통일 적용' },
     { v: 'v1.7.2', notes: '사용 효과 버튼(투시·미래절취·확률)이 여러 개일 때 겹치던 문제 수정 — 세로 정렬' },
     { v: 'v1.7.1', notes: '튜토리얼 완료 팝업 텍스트·요약 글씨 크게' },
