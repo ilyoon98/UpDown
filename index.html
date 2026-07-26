@@ -802,6 +802,7 @@
     transition: fill 0.2s ease;
   }
   .chamber.bullet { fill: #e63946; }
+  .chamber.curse-bullet { fill: #a855f7; } /* 저주로 추가된 탄약 */
   .chamber.empty { fill: #2a9d8f; }
 
   .pointer {
@@ -928,6 +929,36 @@
     z-index: 4000;
   }
   .owned-chip:hover::after { opacity: 1; }
+
+  /* CSS ::after 툴팁 비활성화 — 대신 JS 플로팅 툴팁(.floating-tip)이 처리한다.
+     이유: 활성 효과 패널(.status-list)이 overflow:auto 스크롤 컨테이너라 왼쪽으로 나가는
+     ::after 툴팁이 잘려 PC에서 안 보였다. body에 붙은 fixed 툴팁이면 어디서도 잘리지 않는다. */
+  .card-badge::after,
+  .status-item::after,
+  .owned-chip::after,
+  .augment-color-tag::after { display: none !important; }
+
+  .floating-tip {
+    position: fixed;
+    z-index: 99999;
+    max-width: 280px;
+    background: #16161f;
+    color: #f7f7fa;
+    border: 1px solid #6a6a8c;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.55;
+    white-space: pre-line;
+    text-align: left;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+  }
+  .floating-tip.show { opacity: 1; visibility: visible; }
 
   /* ---------------- 증강 선택 화면 ---------------- */
   .augment-overlay {
@@ -1469,7 +1500,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.8.1</span>
+  <span class="version" id="versionTag">v1.8.2</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -2955,10 +2986,12 @@
 
     // 표시용 총알 수 (실린더는 항상 6챔버)
     let bullets = 1 + augmentState.bulletCurses;
+    let curseBullets = augmentState.bulletCurses; // 저주로 추가된 탄약 수 → 실린더에 보라색으로 표시
     if (forced && forced.doubleVisual) bullets = Math.max(bullets, 2);
     // 1회성 총알 저주는 실패 1회당 1발씩만 소모 — 여러 개 쌓여도 한 번에 몰아 터지지 않게(스파이크 방지). 남은 건 다음 실패로 이월.
     if (!forced && augmentState.pendingBulletBonus > 0) {
       bullets += 1;
+      curseBullets += 1;
       augmentState.pendingBulletBonus -= 1;
     }
     // 딜러의 최후: 마지막 6장 구간은 총알 +1 (강제 결과 제외)
@@ -3005,8 +3038,12 @@
     sfx('spin');
     await spinCylinder(landedIndex);
 
-    // 전체 공개: 장전됐던 챔버는 전부 빨강으로
-    chambers.forEach((c, i) => { if (bulletSet.has(i)) c.classList.add('bullet'); });
+    // 전체 공개: 장전됐던 챔버 표시. 저주로 추가된 탄약(curseBullets)은 보라색으로 구분.
+    const purpleCount = Math.max(0, Math.min(curseBullets, bullets));
+    const curseIdx = new Set([...bulletSet].slice(0, purpleCount));
+    chambers.forEach((c, i) => {
+      if (bulletSet.has(i)) c.classList.add(curseIdx.has(i) ? 'curse-bullet' : 'bullet');
+    });
     const landed = chambers[landedIndex];
 
     if (died) {
@@ -4200,6 +4237,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.8.2', notes: '가독성/툴팁 개선 — 저주로 추가된 총알은 실린더에 보라색으로 구분 표시 · 카드 배지·활성 효과·보유 증강 툴팁을 body 레벨 플로팅 툴팁으로 통합(대비·크기 향상, PC에서 활성 효과 툴팁이 스크롤 패널에 잘려 안 보이던 문제 해결)' },
     { v: 'v1.8.1', notes: '모바일 상단 버튼이 헤더와 겹치던 문제 수정 — 상단 유틸을 문서 흐름 상단으로 옮기고 줄바꿈 허용 · 버전 카드를 다른 버튼과 동일한 크기로 통일(모바일·데스크톱)' },
     { v: 'v1.8.0', notes: '밸런스/버그 묶음 — 딜러의 최후 시야 차단을 패시브(기억/예언/확률)만으로 완화하고 아껴둔 투시·절취는 사용 가능 · 혈맹 1단계 빨강 카드 +1 자기 재트리거 버그 수정 · 흐릿한 예언 저주를 방아쇠 2회 → 1회성 총알 +1로 재가격 · 1회성 총알 저주를 실패당 1발씩 분할 소모(스파이크 방지) · 생명 1단계 보호류 +1을 마일스톤·증강 획득까지 통일 적용' },
     { v: 'v1.7.2', notes: '사용 효과 버튼(투시·미래절취·확률)이 여러 개일 때 겹치던 문제 수정 — 세로 정렬' },
@@ -4513,6 +4551,65 @@
     startGame();
     setTimeout(startTutorial, 300);
   });
+
+  // ---------------------------------------------------------------------
+  // 통합 플로팅 툴팁: data-tooltip을 가진 모든 요소(카드 배지·활성 효과·보유 증강·색 태그)에
+  // 대해 body에 붙은 fixed 툴팁을 띄운다. 스크롤 패널에 잘리지 않고 대비/크기도 개선.
+  // PC=hover, 모바일=탭으로 토글.
+  // ---------------------------------------------------------------------
+  (function initFloatingTooltip() {
+    const tip = document.createElement('div');
+    tip.className = 'floating-tip';
+    document.body.appendChild(tip);
+    let target = null;
+
+    function place(el) {
+      const r = el.getBoundingClientRect();
+      const tr = tip.getBoundingClientRect();
+      const m = 10;
+      let top = r.top - tr.height - m;          // 기본: 요소 위
+      if (top < m) top = r.bottom + m;          // 위 공간 없으면 아래
+      if (top + tr.height > window.innerHeight - m) {
+        top = Math.max(m, window.innerHeight - tr.height - m);
+      }
+      let left = r.left + r.width / 2 - tr.width / 2;
+      left = Math.max(m, Math.min(left, window.innerWidth - tr.width - m));
+      tip.style.top = top + 'px';
+      tip.style.left = left + 'px';
+    }
+    function show(el) {
+      const text = el.getAttribute('data-tooltip');
+      if (!text) return;
+      target = el;
+      tip.textContent = text;
+      tip.classList.add('show');
+      place(el); // show로 크기가 잡힌 뒤 위치 계산
+    }
+    function hide() { target = null; tip.classList.remove('show'); }
+
+    document.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('[data-tooltip]');
+      if (el && el !== target) show(el);
+    });
+    document.addEventListener('mouseout', (e) => {
+      const el = e.target.closest('[data-tooltip]');
+      if (el && el === target && !el.contains(e.relatedTarget)) hide();
+    });
+    // 모바일: 탭으로 토글, 바깥 탭이면 닫기
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-tooltip]');
+      if (el) { target === el ? hide() : show(el); }
+      else hide();
+    });
+    // 스크롤/리사이즈 시 위치 갱신(대상이 사라졌으면 닫기)
+    const reflow = () => {
+      if (!target) return;
+      if (!document.body.contains(target)) { hide(); return; }
+      place(target);
+    };
+    window.addEventListener('scroll', reflow, true);
+    window.addEventListener('resize', reflow);
+  })();
 
   buildCardGrid();
   buildCylinder();
