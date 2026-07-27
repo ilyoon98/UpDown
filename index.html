@@ -938,27 +938,90 @@
   .owned-chip::after,
   .augment-color-tag::after { display: none !important; }
 
+  /* 통합 플로팅 툴팁 — 제목 + 본문 + (증강은) 축복/저주 행 구조 */
   .floating-tip {
     position: fixed;
     z-index: 99999;
-    max-width: 280px;
-    background: #16161f;
-    color: #f7f7fa;
-    border: 1px solid #6a6a8c;
-    border-radius: 10px;
-    padding: 12px 14px;
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.55;
-    white-space: pre-line;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 24px));
+    background: #14141d;
+    color: #ececf4;
+    border: 1px solid #7a7aa0;
+    border-radius: 12px;
+    padding: 0;
+    overflow: hidden;
     text-align: left;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 0, 0, 0.5);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.12s ease;
+    transform: translateY(4px);
+    transition: opacity 0.13s ease, transform 0.13s ease;
   }
-  .floating-tip.show { opacity: 1; visibility: visible; }
+  .floating-tip.show { opacity: 1; visibility: visible; transform: translateY(0); }
+
+  /* 종류별 강조 색 (왼쪽 띠 + 제목 색) */
+  .floating-tip .ft-inner { border-left: 4px solid #7a7aa0; padding: 11px 14px 12px; }
+  .floating-tip.k-buff    .ft-inner { border-left-color: #2ecfae; }
+  .floating-tip.k-debuff  .ft-inner { border-left-color: #ff5c5c; }
+  .floating-tip.k-neutral .ft-inner { border-left-color: #ffd166; }
+  .floating-tip.k-info    .ft-inner { border-left-color: #7bb7ff; }
+
+  .floating-tip .ft-title {
+    font-size: 15px;
+    font-weight: 900;
+    line-height: 1.35;
+    margin-bottom: 5px;
+    color: #ffffff;
+    letter-spacing: -0.2px;
+  }
+  .floating-tip.k-buff    .ft-title { color: #6ff0d3; }
+  .floating-tip.k-debuff  .ft-title { color: #ff9d9d; }
+  .floating-tip.k-neutral .ft-title { color: #ffd97a; }
+  .floating-tip.k-info    .ft-title { color: #9cccff; }
+
+  .floating-tip .ft-body {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.6;
+    color: #d9d9e6;
+    white-space: pre-line;
+  }
+  /* 축복/저주 행 (증강 칩·색 태그) */
+  .floating-tip .ft-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 14px;
+    line-height: 1.55;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .floating-tip .ft-row:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .floating-tip .ft-tag {
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-top: 1px;
+  }
+  .floating-tip .ft-tag.good { background: rgba(46, 207, 174, 0.2); color: #6ff0d3; }
+  .floating-tip .ft-tag.bad  { background: rgba(255, 92, 92, 0.2); color: #ff9d9d; }
+  .floating-tip .ft-row .ft-text { color: #e4e4ee; font-weight: 500; }
+  .floating-tip .ft-row.none .ft-text { color: #9a9aae; }
+  /* 힌트 줄 (조작 안내 등) */
+  .floating-tip .ft-hint {
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: #9e9eb8;
+    font-weight: 600;
+  }
+  @media (max-width: 600px) {
+    .floating-tip .ft-title { font-size: 15px; }
+    .floating-tip .ft-body, .floating-tip .ft-row { font-size: 13.5px; }
+  }
 
   /* ---------------- 증강 선택 화면 ---------------- */
   .augment-overlay {
@@ -1500,7 +1563,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.8.2</span>
+  <span class="version" id="versionTag">v1.8.3</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -2387,23 +2450,73 @@
     return arr;
   }
 
-  // 색상 자원 뱃지: 고유명사 + 호버 설명 (증강 보유 시 수치 반영)
+  // 색상 자원 뱃지: 고유명사 + 호버 설명.
+  // "이 카드를 맞히면 무엇을 받는가 → 그 자원은 어디에 쓰는가" 순서로 적어
+  // 처음 보는 사람도 자원의 쓸모를 바로 알 수 있게 한다. 보유 증강·세트 효과도 반영.
   function suitBadgeInfo(suit) {
     const s = augmentState;
-    switch (suit) {
-      case 'red': return { label: '🔥 정열', tip: `정답 시 🔴 자원 +${s.hasRedContract ? 2 : 1}. 상점에서 콤보 부스트 구매에 사용.${s.hasRedContract ? ' (붉은 계약: 오답 시 방아쇠 +2회)' : ''}` };
-      case 'yellow': return { label: '💰 황금', tip: `정답 시 🟡 자원 +${s.hasGoldenEye ? 2 : 1}. 상점에서 리롤 구매에 사용.` };
-      case 'blue': return { label: '📘 지혜', tip: '정답 시 🔵 자원 +1. 상점에서 카드 투시 구매에 사용.' };
-      case 'green': return { label: '🌿 생명', tip: '정답 시 🟢 자원 +1. 상점에서 룰렛 방패 구매에 사용.' };
-      default: return null;
-    }
+    const meta = {
+      red:    { label: '🔥 정열',  icon: '🔴', name: '빨강', use: '🔥 열기 (정답 3회 콤보 2배)' },
+      blue:   { label: '📘 지혜',  icon: '🔵', name: '파랑', use: '🔍 카드 투시 (다음 카드 미리보기)' },
+      green:  { label: '🌿 생명',  icon: '🟢', name: '초록', use: '🛡 룰렛 방패 (실패 1회 무효)' },
+      yellow: { label: '💰 황금',  icon: '🟡', name: '노랑', use: '🔄 리롤 (증강 카드 교체)' },
+    }[suit];
+    if (!meta) return null;
+
+    // 이 색 카드를 맞혔을 때 실제로 들어오는 자원 수 (증강 + 세트 1단계 반영)
+    let amount = 1;
+    const extras = [];
+    if (suit === 'red' && s.hasRedContract) { amount = 2; extras.push('🔴 붉은 계약: 자원 2배'); }
+    if (suit === 'yellow' && s.hasGoldenEye) { amount = 2; extras.push('🟡 황금 감식안: 자원 2배'); }
+    if (suit === 'yellow' && setLevel('yellow') >= 1) { amount += 1; extras.push('🟡 황금 1단계: 자원 +1'); }
+
+    // 세트 1단계의 '카드 색 연결' 보너스
+    if (suit === 'red' && setLevel('red') >= 1) extras.push('🔴 혈맹 1단계: 콤보 +1');
+    if (suit === 'blue' && setLevel('blue') >= 1) extras.push(`🔵 지혜 1단계: 투시 게이지 ${s.blueGauge}/5 (채우면 투시 +1)`);
+    if (suit === 'green' && setLevel('green') >= 1) extras.push(`🟢 생명 1단계: 방패 게이지 ${s.greenGauge}/4 (채우면 방패 +1)`);
+
+    let tip = `맞히면 ${meta.icon} ${meta.name} 자원 ${amount}개를 받습니다.\n상점 용도 — ${meta.use}`;
+    if (extras.length) tip += `\n\n지금 걸린 보너스\n· ${extras.join('\n· ')}`;
+    const warn = (suit === 'red' && s.hasRedContract)
+      ? '⚠ 붉은 계약 — 빨강 카드를 틀리면 방아쇠를 2회 더 당깁니다.' : null;
+
+    return {
+      label: meta.label,
+      title: `${meta.label} — ${meta.name} 카드`,
+      kind: warn ? 'debuff' : 'info',
+      tip,
+      hint: warn,
+    };
   }
 
-  // 특별 숫자 효과 뱃지
+  // 특별 숫자 효과 뱃지 — "왜 이 보상인지"까지 한 줄로 덧붙여 납득감을 준다
   function numberBadgeInfo(n) {
-    if (n === 1 || n === 10) return { label: '⭐ 극단', tip: '정답 시 이 카드 색의 자원을 1개 더 받습니다 (총 +2).' };
-    if (n === 5 || n === 6) return { label: '🎲 승부수', tip: '정답 시 콤보 +2. 중앙값은 맞히기 어려운 만큼 보상도 큽니다.' };
-    if (n === 7) return { label: '🍀 럭키세븐', tip: '정답 시 콤보 +3!' };
+    if (n === 1 || n === 10) return {
+      label: '⭐ 극단',
+      title: '⭐ 극단 — 1과 10',
+      kind: 'info',
+      tip: '맞히면 이 카드 색의 자원을 1개 더 받습니다.\n끝 숫자라 다음 카드의 방향은 거의 정해져 있습니다 — 안전한 대신 콤보 보너스는 없습니다.',
+    };
+    if (n === 5 || n === 6) {
+      if (augmentState.hasCentrism) return {
+        label: '🎲 승부수',
+        title: '🎲 승부수 — 봉인됨',
+        kind: 'debuff',
+        tip: '원래는 맞히면 콤보 +2를 주는 숫자입니다.\n\n⚠ 중용의 길 저주로 이 보너스가 무효화되어 지금은 아무 효과가 없습니다.',
+      };
+      return {
+        label: '🎲 승부수',
+        title: '🎲 승부수 — 5와 6',
+        kind: 'neutral',
+        tip: '맞히면 콤보 +2.\n한가운데 숫자라 업/다운이 거의 반반 — 위험한 만큼 보상이 큽니다.',
+      };
+    }
+    if (n === 7) return {
+      label: '🍀 럭키세븐',
+      title: '🍀 럭키세븐 — 7',
+      kind: 'neutral',
+      tip: '맞히면 콤보 +3.\n한 장으로 얻는 숫자 보너스 중 가장 큽니다.',
+    };
     return null;
   }
 
@@ -2417,9 +2530,13 @@
     el.classList.add(card.suit);
     const suitB = suitBadgeInfo(card.suit);
     const numB = numberBadgeInfo(card.number);
+    // 툴팁 본문에 줄바꿈/기호가 들어가므로 속성값을 이스케이프한다
+    const attr = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const badgeAttrs = (b) => `data-tooltip="${attr(b.tip)}" data-tip-title="${attr(b.title)}" data-tip-kind="${b.kind}"`
+      + (b.hint ? ` data-tip-hint="${attr(b.hint)}"` : '');
     let badges = `<div class="card-badges">`;
-    if (suitB) badges += `<span class="card-badge" data-tooltip="${suitB.tip}">${suitB.label}</span>`;
-    if (numB) badges += `<span class="card-badge num" data-tooltip="${numB.tip}">${numB.label}</span>`;
+    if (suitB) badges += `<span class="card-badge" ${badgeAttrs(suitB)}>${suitB.label}</span>`;
+    if (numB) badges += `<span class="card-badge num" ${badgeAttrs(numB)}>${numB.label}</span>`;
     badges += '</div>';
     el.innerHTML = `${card.number}<div class="suit-label">${card.label}</div>${badges}`;
   }
@@ -2730,7 +2847,18 @@
       const icon = COLOR_SETS[aug.color] ? COLOR_SETS[aug.color].icon + ' ' : '';
       chip.textContent = icon + (charges === null ? aug.name : `${aug.name} ×${charges}`);
       if (charges === 0) chip.classList.add('depleted');
-      chip.dataset.tooltip = `축복: ${aug.good}\n저주: ${aug.bad}`;
+      // 제목(이름·티어·학파) + 축복/저주 행 + 남은 횟수 안내로 구조화
+      const set = COLOR_SETS[aug.color];
+      chip.dataset.tipTitle = `${aug.name}`;
+      chip.dataset.tooltip = `${TIER_LABEL[aug.tier]} · ${set ? set.icon + ' ' + set.name + '(' + set.school + ') 학파' : ''}`;
+      chip.dataset.tipGood = aug.good;
+      chip.dataset.tipBad = aug.bad;
+      chip.dataset.tipKind = aug.tier === 3 ? 'debuff' : aug.tier === 2 ? 'neutral' : 'buff';
+      if (charges !== null) {
+        chip.dataset.tipHint = charges === 0
+          ? '남은 횟수 0 — 이 증강은 모두 소모했습니다.'
+          : `남은 횟수 ${charges}회`;
+      }
       ownedList.appendChild(chip);
     });
     renderActiveEffects(); // 보유 증강이 바뀌면 활성 효과도 같이 갱신
@@ -2812,7 +2940,12 @@
       const div = document.createElement('div');
       div.className = `status-item ${it.cls}`;
       div.textContent = it.text;
-      if (it.tip) div.dataset.tooltip = it.tip;
+      if (it.tip) {
+        // 항목 이름을 툴팁 제목으로 올려 무엇에 대한 설명인지 바로 보이게 한다
+        div.dataset.tipTitle = it.text;
+        div.dataset.tooltip = it.tip;
+        div.dataset.tipKind = it.cls; // buff / debuff / neutral → 색 구분
+      }
       statusList.appendChild(div);
     });
   }
@@ -3358,14 +3491,31 @@
           <div class="set-strip sc-${aug.color}"></div>
           <div class="augment-icon">${aug.tier}</div>
           <div class="augment-name">${aug.name}</div>
-          <div class="augment-tier">${TIER_LABEL[aug.tier]}</div>
-          <div class="augment-color-tag ct-${aug.color}" data-tooltip="${(() => {
+          <div class="augment-tier" data-tip-title="${TIER_LABEL[aug.tier]}" data-tip-kind="${aug.tier === 3 ? 'debuff' : aug.tier === 2 ? 'neutral' : 'buff'}" data-tooltip="${{
+            1: '저주가 없거나 아주 가벼운 증강입니다. 안전하게 힘을 쌓고 싶을 때 고르세요.',
+            2: '쓸 만한 축복에 조건부·1회성 저주가 붙습니다. 이득과 위험을 저울질하는 선택지입니다.',
+            3: '가장 강력한 축복에 판이 끝날 때까지 남는 영구 저주가 따라옵니다. 판을 뒤집고 싶을 때만.',
+          }[aug.tier]}">${TIER_LABEL[aug.tier]}</div>
+          <div class="augment-color-tag ct-${aug.color}" ${(() => {
             const set = COLOR_SETS[aug.color];
+            const now = ownedColorCount(aug.color);
             // 이 증강을 고르면 올라갈 개수 기준으로 다음 단계를 안내
-            const after = ownedColorCount(aug.color) + (augmentState.owned.includes(aug.id) ? 0 : 1);
-            const nextTier = after >= 4 ? `2단계: ${set.t2}` : after >= 2 ? `1단계: ${set.t1}` : `2개→1단계 / 4개→2단계`;
-            return `${set.name}(${set.school}) 학파 · 선택 시 ${after}개 · ${nextTier}`;
-          })()}">${COLOR_SETS[aug.color].icon} ${COLOR_SETS[aug.color].name} ${setLevel(aug.color) >= 1 ? setLevel(aug.color) + '단계' : ownedColorCount(aug.color) + '/2'}</div>
+            const after = now + (augmentState.owned.includes(aug.id) ? 0 : 1);
+            const lvAfter = after >= 4 ? 2 : after >= 2 ? 1 : 0;
+            const lvNow = setLevel(aug.color);
+            let body = `지금 ${now}개 보유 → 이 증강을 고르면 ${after}개.\n\n`;
+            if (lvAfter > lvNow) {
+              body += `✨ 고르는 순간 ${lvAfter}단계 개방!\n${lvAfter >= 2 ? set.t2 : set.t1}`;
+            } else if (lvAfter >= 1) {
+              const need = lvAfter >= 2 ? 0 : 4 - after;
+              body += `현재 ${lvAfter}단계 효과\n${lvAfter >= 2 ? set.t2 : set.t1}`;
+              if (need > 0) body += `\n\n이 색을 ${need}개 더 모으면 2단계: ${set.t2}`;
+            } else {
+              body += `아직 단계 효과가 없습니다.\n이 색을 ${2 - after}개 더 모으면 1단계: ${set.t1}`;
+            }
+            const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            return `data-tip-title="${esc(set.icon + ' ' + set.name + ' 학파 · ' + set.school)}" data-tip-kind="info" data-tooltip="${esc(body)}" data-tip-hint="같은 색 2개 → 1단계 · 4개 → 2단계"`;
+          })()}>${COLOR_SETS[aug.color].icon} ${COLOR_SETS[aug.color].name} ${setLevel(aug.color) >= 1 ? setLevel(aug.color) + '단계' : ownedColorCount(aug.color) + '/2'}</div>
           <div class="augment-box blessing">
             <div class="box-label">축복</div>
             <div class="box-body">${aug.good}</div>
@@ -4237,6 +4387,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.8.3', notes: '툴팁 전면 개편 — 제목+본문 구조에 축복/저주 행과 종류별 색 띠(버프 초록·저주 빨강·중립 노랑) 적용 · 카드 배지는 보유 증강과 세트 효과를 반영한 실제 획득량을 안내 · 학파 태그는 "지금 N개 → 고르면 N+1개 → 개방되는 효과"로 재작성 · 티어 라벨 설명 추가' },
     { v: 'v1.8.2', notes: '가독성/툴팁 개선 — 저주로 추가된 총알은 실린더에 보라색으로 구분 표시 · 카드 배지·활성 효과·보유 증강 툴팁을 body 레벨 플로팅 툴팁으로 통합(대비·크기 향상, PC에서 활성 효과 툴팁이 스크롤 패널에 잘려 안 보이던 문제 해결)' },
     { v: 'v1.8.1', notes: '모바일 상단 버튼이 헤더와 겹치던 문제 수정 — 상단 유틸을 문서 흐름 상단으로 옮기고 줄바꿈 허용 · 버전 카드를 다른 버튼과 동일한 크기로 통일(모바일·데스크톱)' },
     { v: 'v1.8.0', notes: '밸런스/버그 묶음 — 딜러의 최후 시야 차단을 패시브(기억/예언/확률)만으로 완화하고 아껴둔 투시·절취는 사용 가능 · 혈맹 1단계 빨강 카드 +1 자기 재트리거 버그 수정 · 흐릿한 예언 저주를 방아쇠 2회 → 1회성 총알 +1로 재가격 · 1회성 총알 저주를 실패당 1발씩 분할 소모(스파이크 방지) · 생명 1단계 보호류 +1을 마일스톤·증강 획득까지 통일 적용' },
@@ -4577,27 +4728,57 @@
       tip.style.top = top + 'px';
       tip.style.left = left + 'px';
     }
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    // data-* 속성으로 구조화된 툴팁을 만든다.
+    //  data-tooltip   : 본문 (필수)
+    //  data-tip-title : 제목 (선택)
+    //  data-tip-kind  : buff | debuff | neutral | info — 왼쪽 띠·제목 색
+    //  data-tip-good / data-tip-bad : 증강의 축복/저주 행 (선택)
+    //  data-tip-hint  : 하단 회색 안내 줄 (선택)
+    function build(el) {
+      const body = el.getAttribute('data-tooltip') || '';
+      const title = el.getAttribute('data-tip-title');
+      const good = el.getAttribute('data-tip-good');
+      const bad = el.getAttribute('data-tip-bad');
+      const hint = el.getAttribute('data-tip-hint');
+      let html = '';
+      if (title) html += `<div class="ft-title">${esc(title)}</div>`;
+      if (body) html += `<div class="ft-body">${esc(body)}</div>`;
+      if (good !== null) {
+        html += `<div class="ft-row"><span class="ft-tag good">축복</span><span class="ft-text">${esc(good)}</span></div>`;
+      }
+      if (bad !== null) {
+        const none = /^없음/.test(bad.trim());
+        html += `<div class="ft-row${none ? ' none' : ''}"><span class="ft-tag bad">저주</span><span class="ft-text">${esc(bad)}</span></div>`;
+      }
+      if (hint) html += `<div class="ft-hint">${esc(hint)}</div>`;
+      return `<div class="ft-inner">${html}</div>`;
+    }
+
     function show(el) {
-      const text = el.getAttribute('data-tooltip');
-      if (!text) return;
+      const hasContent = el.hasAttribute('data-tooltip') || el.hasAttribute('data-tip-title');
+      if (!hasContent) return;
       target = el;
-      tip.textContent = text;
+      tip.innerHTML = build(el);
+      tip.className = 'floating-tip k-' + (el.getAttribute('data-tip-kind') || 'info');
       tip.classList.add('show');
       place(el); // show로 크기가 잡힌 뒤 위치 계산
     }
     function hide() { target = null; tip.classList.remove('show'); }
 
+    const SEL = '[data-tooltip],[data-tip-title]';
     document.addEventListener('mouseover', (e) => {
-      const el = e.target.closest('[data-tooltip]');
+      const el = e.target.closest(SEL);
       if (el && el !== target) show(el);
     });
     document.addEventListener('mouseout', (e) => {
-      const el = e.target.closest('[data-tooltip]');
+      const el = e.target.closest(SEL);
       if (el && el === target && !el.contains(e.relatedTarget)) hide();
     });
     // 모바일: 탭으로 토글, 바깥 탭이면 닫기
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-tooltip]');
+      const el = e.target.closest(SEL);
       if (el) { target === el ? hide() : show(el); }
       else hide();
     });
