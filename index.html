@@ -1651,7 +1651,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.9.0</span>
+  <span class="version" id="versionTag">v1.9.1</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -4518,6 +4518,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.9.1', notes: '🐶 이스터에그 수정 — 마우스를 조금만 움직여도 강아지가 바로 사라지던 문제 해결. 이제 마우스 이동·스크롤로는 사라지지 않고, 클릭·키 입력 같은 실제 조작에만 퇴장하며 최소 5초는 머뭅니다' },
     { v: 'v1.9.0', notes: '예언 표시를 카드 바로 아래 보라 글로우 배지로 이동·강조(기존엔 화면 최하단 작은 글씨라 안 보였음) + 범위 의미를 설명하는 툴팁 추가 · 🐶 이스터에그: 1분간 아무 입력이 없으면 강아지가 슬쩍 올라와 잠듭니다 (아무 조작이나 하면 사라짐)' },
     { v: 'v1.8.3', notes: '툴팁 전면 개편 — 제목+본문 구조에 축복/저주 행과 종류별 색 띠(버프 초록·저주 빨강·중립 노랑) 적용 · 카드 배지는 보유 증강과 세트 효과를 반영한 실제 획득량을 안내 · 학파 태그는 "지금 N개 → 고르면 N+1개 → 개방되는 효과"로 재작성 · 티어 라벨 설명 추가' },
     { v: 'v1.8.2', notes: '가독성/툴팁 개선 — 저주로 추가된 총알은 실린더에 보라색으로 구분 표시 · 카드 배지·활성 효과·보유 증강 툴팁을 body 레벨 플로팅 툴팁으로 통합(대비·크기 향상, PC에서 활성 효과 툴팁이 스크롤 패널에 잘려 안 보이던 문제 해결)' },
@@ -4942,29 +4943,53 @@
       '💤 여기서 자면 안 되는 거 아는데… 조금만요.',
       '🐶 돌아오면 같이 이어서 해요!',
     ];
+    const MIN_VISIBLE_MS = 5000; // 등장했으면 최소 이만큼은 보여준다 (깜빡 사라짐 방지)
     let idleTimer = null;
+    let hideTimer = null;
     let visits = 0;
+    let shownAt = 0;
+    const isShown = () => egg.classList.contains('show');
 
     function hide() {
-      if (egg.classList.contains('show')) egg.classList.remove('show');
+      clearTimeout(hideTimer);
+      egg.classList.remove('show');
     }
     function show() {
-      // 결과 화면·튜토리얼 중에는 방해하지 않는다
+      // 튜토리얼 중에는 방해하지 않는다
       if (document.querySelector('.tutorial-overlay.show')) return;
       msgEl.textContent = MESSAGES[visits % MESSAGES.length];
       visits++;
+      shownAt = Date.now();
       egg.classList.add('show');
     }
-    function reset() {
-      hide();
+    function schedule() {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(show, IDLE_MS);
     }
-    ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'click', 'scroll']
-      .forEach((ev) => window.addEventListener(ev, reset, { passive: true }));
+
+    // 마우스 이동·스크롤은 "자리에 있다"는 신호일 뿐 — 자고 있는 강아지를 쫓아내지 않는다.
+    // (이게 dismiss 트리거면 강아지를 보러 마우스를 움직이는 순간 사라져버린다)
+    function onPassive() {
+      if (!isShown()) schedule();
+    }
+    // 클릭·키 입력·터치는 실제로 다시 플레이한다는 신호 — 최소 노출 시간을 채운 뒤 보낸다
+    function onActive() {
+      if (isShown()) {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { hide(); schedule(); },
+          Math.max(0, MIN_VISIBLE_MS - (Date.now() - shownAt)));
+        return;
+      }
+      schedule();
+    }
+    ['mousemove', 'scroll'].forEach((ev) => window.addEventListener(ev, onPassive, { passive: true }));
+    ['mousedown', 'click', 'keydown', 'touchstart', 'wheel'].forEach((ev) => window.addEventListener(ev, onActive, { passive: true }));
     // 탭을 벗어났다 돌아오면 타이머만 다시 시작 (백그라운드에서 튀어나오지 않게)
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) reset(); else { hide(); clearTimeout(idleTimer); } });
-    reset();
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { hide(); clearTimeout(idleTimer); }
+      else schedule();
+    });
+    schedule();
   })();
 
   buildCardGrid();
