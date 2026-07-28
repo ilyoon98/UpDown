@@ -430,6 +430,24 @@
     border-radius: 999px;
     padding: 2px 8px;
   }
+  /* 아직 발견하지 않은 증강 — 흐리게 + ??? */
+  .codex-item.undiscovered { opacity: 0.42; }
+  .codex-item.undiscovered .cx-name { color: #8a8a9e; letter-spacing: 0.06em; }
+  .codex-item.undiscovered .cx-desc { color: #7a7a8e; font-style: italic; }
+  /* 수집 진행 바 */
+  .codex-collect {
+    height: 10px;
+    border-radius: 999px;
+    background: #1a1a26;
+    border: 1px solid #3a3a52;
+    overflow: hidden;
+    margin: 2px 0 10px;
+  }
+  .codex-collect .cc-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #d4a017, var(--gold));
+    transition: width 0.4s ease;
+  }
   .codex-close {
     display: block;
     margin: 18px auto 0;
@@ -1135,6 +1153,29 @@
   .augment-card.set-green  { background: linear-gradient(180deg, rgba(42,157,143,0.13), #24243a 36%); }
   .augment-card.set-yellow { background: linear-gradient(180deg, rgba(212,160,23,0.13), #24243a 36%); }
 
+  /* 아직 도감에 없는 증강임을 알리는 NEW 리본 */
+  .augment-new {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    color: #1e1e2e;
+    background: linear-gradient(135deg, #ffd166, #fff0b8);
+    border-radius: 999px;
+    padding: 3px 9px;
+    cursor: help;
+    pointer-events: auto;
+    box-shadow: 0 0 12px rgba(255, 209, 102, 0.75);
+    animation: newPulse 1.5s ease infinite;
+  }
+  @keyframes newPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 209, 102, 0.6); }
+    50%      { transform: scale(1.09); box-shadow: 0 0 20px rgba(255, 209, 102, 0.95); }
+  }
+
   /* 보유 증강 칩에도 세트 색 왼쪽 띠 */
   .owned-chip.sc-red    { border-left: 5px solid #ff7b7b; }
   .owned-chip.sc-blue   { border-left: 5px solid #7bb7ff; }
@@ -1645,7 +1686,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.11.1</span>
+  <span class="version" id="versionTag">v1.12.0</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -2515,6 +2556,39 @@
   function markPlayed() {
     isFirstRun = false;
     try { localStorage.setItem('updown_played', '1'); } catch (e) { /* 무시 */ }
+  }
+
+  // ---------------------------------------------------------------------
+  // 도감 수집 기록 (판을 넘어 브라우저에 남는다)
+  //  discovered : 한 번이라도 획득해 본 증강 id 집합 — 도감 공개 + NEW 태그 판정
+  //  deaths     : 누적 사망 횟수 — 해금 조건에 쓰인다
+  // ---------------------------------------------------------------------
+  const CODEX_STORAGE_KEY = 'updown_codex';
+  const codexData = { discovered: new Set(), deaths: 0 };
+  try {
+    const raw = JSON.parse(localStorage.getItem(CODEX_STORAGE_KEY) || '{}');
+    if (Array.isArray(raw.discovered)) codexData.discovered = new Set(raw.discovered);
+    if (Number.isFinite(raw.deaths)) codexData.deaths = raw.deaths;
+  } catch (e) { /* 손상됐거나 접근 불가면 빈 도감으로 시작 */ }
+
+  function saveCodex() {
+    try {
+      localStorage.setItem(CODEX_STORAGE_KEY, JSON.stringify({
+        discovered: [...codexData.discovered],
+        deaths: codexData.deaths,
+      }));
+    } catch (e) { /* 저장 불가 환경 무시 */ }
+  }
+  const isDiscovered = (id) => codexData.discovered.has(id);
+  function markDiscovered(id) {
+    if (codexData.discovered.has(id)) return false; // 이미 아는 증강
+    codexData.discovered.add(id);
+    saveCodex();
+    return true; // 이번에 처음 발견 (NEW였던 것)
+  }
+  function markDeath() {
+    codexData.deaths++;
+    saveCodex();
   }
 
   // 튜토리얼 시청 여부는 별도 키로 관리한다. 완주(markPlayed)에 묶어두면
@@ -3607,6 +3681,7 @@
         card.style.animationDelay = `${animDelay}s`;
         card.innerHTML = `
           <div class="set-strip sc-${aug.color}"></div>
+          ${isDiscovered(aug.id) ? '' : '<div class="augment-new" data-tip-title="✨ 처음 보는 증강" data-tip-kind="buff" data-tooltip="아직 도감에 없는 증강이에요. 고르면 📖 도감에 영구히 기록됩니다.">NEW</div>'}
           <div class="augment-icon">${aug.tier}</div>
           <div class="augment-name">${aug.name}</div>
           <div class="augment-tier" data-tip-title="${TIER_LABEL[aug.tier]}" data-tip-kind="${aug.tier === 3 ? 'debuff' : aug.tier === 2 ? 'neutral' : 'buff'}" data-tooltip="${{
@@ -3744,6 +3819,12 @@
     }
     const chosen = await showAugmentScreen(stageIndex, options);
     augmentState.owned.push(chosen.id);
+    // 도감에 영구 기록. 처음 보는 증강이면 발견 연출을 띄운다.
+    if (markDiscovered(chosen.id)) {
+      fx.float(window.innerWidth / 2, window.innerHeight / 2 - 120,
+        `📖 도감 등록! ${chosen.name}`, '#ffd166', 26);
+      fx.confetti(30);
+    }
     chosen.apply(augmentState);
     checkColorSets();
     renderAll();
@@ -3860,6 +3941,7 @@
   function endGame(win, cause) {
     setChoiceButtons(false);
     markPlayed(); // 한 판을 끝냈으니 이후로는 첫 증강 큐레이션 해제
+    if (!win) markDeath(); // 누적 사망 횟수 — 해금 조건에 쓰인다
     restartBtn.classList.add('attention');
     if (win) {
       setMessage(`카드를 모두 소진했습니다! 최종 연속 성공: ${streak}`, 'win');
@@ -4470,6 +4552,17 @@
       codexBody.appendChild(item);
     });
 
+    // 수집 현황 — 도감을 채우는 재미를 보여준다
+    const foundCount = AUGMENTS.filter((a) => isDiscovered(a.id)).length;
+    const collectTitle = document.createElement('div');
+    collectTitle.className = 'codex-tier-title t1';
+    collectTitle.textContent = `📖 증강 수집 ${foundCount} / ${AUGMENTS.length}`;
+    codexBody.appendChild(collectTitle);
+    const collectBar = document.createElement('div');
+    collectBar.className = 'codex-collect';
+    collectBar.innerHTML = `<div class="cc-fill" style="width:${(foundCount / AUGMENTS.length * 100).toFixed(1)}%"></div>`;
+    codexBody.appendChild(collectBar);
+
     [1, 2, 3].forEach((tier) => {
       const title = document.createElement('div');
       title.className = `codex-tier-title t${tier}`;
@@ -4477,12 +4570,22 @@
       codexBody.appendChild(title);
       AUGMENTS.filter((a) => a.tier === tier).forEach((aug) => {
         const item = document.createElement('div');
-        item.className = 'codex-item';
-        item.innerHTML = `
-          <span class="cx-name">${COLOR_SETS[aug.color] ? COLOR_SETS[aug.color].icon + ' ' : ''}${aug.name}</span>
-          <span class="cx-desc"><span class="good">축복: ${aug.good}</span><br><span class="bad">저주: ${aug.bad}</span></span>
-          ${augmentState.owned.includes(aug.id) ? '<span class="cx-owned">보유중</span>' : ''}
-        `;
+        const found = isDiscovered(aug.id);
+        item.className = 'codex-item' + (found ? '' : ' undiscovered');
+        const icon = COLOR_SETS[aug.color] ? COLOR_SETS[aug.color].icon + ' ' : '';
+        if (found) {
+          item.innerHTML = `
+            <span class="cx-name">${icon}${aug.name}</span>
+            <span class="cx-desc"><span class="good">축복: ${aug.good}</span><br><span class="bad">저주: ${aug.bad}</span></span>
+            ${augmentState.owned.includes(aug.id) ? '<span class="cx-owned">보유중</span>' : ''}
+          `;
+        } else {
+          // 아직 한 번도 얻어보지 못한 증강 — 색과 등급만 흘리고 나머지는 감춘다
+          item.innerHTML = `
+            <span class="cx-name">${icon}???</span>
+            <span class="cx-desc">아직 발견하지 않은 증강입니다.<br>한 번 획득하면 도감에 기록돼요.</span>
+          `;
+        }
         codexBody.appendChild(item);
       });
     });
@@ -4529,6 +4632,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.12.0', notes: '📖 도감이 수집형이 되었습니다 — 한 번이라도 획득한 증강만 공개되고, 아직 못 만난 증강은 색과 등급만 남긴 채 ???로 가려집니다. 상단에 수집 진행도(N/28)가 표시되고, 증강 선택 화면에서 아직 도감에 없는 증강에는 ✨NEW 태그가 붙습니다. 수집 기록은 판이 끝나도 브라우저에 남습니다' },
     { v: 'v1.11.1', notes: '🐶 강아지에게 이름이 생겼어요 — 뭉치! 멘트가 12종으로 늘고 자는 동안 6초마다 계속 바뀝니다(한 바퀴 도는 동안 같은 멘트가 반복되지 않아요). 다시 플레이하면 뭉치가 눈을 번쩍 뜨고 화들짝 놀라며 인사한 뒤 자리를 뜹니다' },
     { v: 'v1.11.0', notes: '🛒 상점이 노드형으로 바뀌었습니다 — 아무 때나 들어가는 대신 8·13·18·23·28·33장에 도달하면 자동으로 열립니다. 매 방문마다 7종 중 4종만 진열되고(방어 아이템 최소 1개 보장), "다음 상점까지 N장"이 표시돼 자원을 지금 쓸지 아껴둘지 고민하게 됩니다' },
     { v: 'v1.10.1', notes: '튜토리얼 — 틀린 뒤 곧바로 룰렛으로 넘어가지 않고, 카드 아래에서 "업/다운은 언제든 틀릴 수 있다"를 먼저 설명합니다 · 마지막 단계의 색 동그라미에 마우스를 올리면 세트 효과를 볼 수 있습니다 · 🐶 이스터에그가 한 번도 안 나오던 문제 수정(튜토리얼 중 등장 시각이 지나면 예약이 소멸해 이후로 영영 안 떴습니다) · 강아지 말풍선이 얼굴을 가리지 않게 위로 이동' },
