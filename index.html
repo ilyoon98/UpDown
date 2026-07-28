@@ -1526,6 +1526,24 @@
     transition: opacity 0.4s ease 0.5s;
   }
   .doggo-egg.show .doggo-msg { opacity: 1; }
+  /* 멘트 교체 시 살짝 페이드 (자는 동안 주기적으로 바뀐다) */
+  .doggo-egg.show .doggo-msg.swap { opacity: 0; transform: translateY(5px); }
+
+  /* ---- 깨어나는 순간: 눈을 뜨고 화들짝 놀란 뒤 자리를 뜬다 ---- */
+  .d-eye-open { opacity: 0; }
+  .doggo-egg.waking .d-eye-closed { opacity: 0; }
+  .doggo-egg.waking .d-eye-open { opacity: 1; }
+  .doggo-egg.waking .doggo-zzz { opacity: 0; transition: opacity 0.25s ease; }
+  /* 숨쉬기(.show .doggo-svg)와 같은 특이도라 순서상 이 규칙이 이긴다 */
+  .doggo-egg.waking .doggo-svg { animation: doggoWake 1.15s cubic-bezier(.3,1.4,.4,1); }
+  @keyframes doggoWake {
+    0%   { transform: translateY(0) rotate(0deg); }
+    18%  { transform: translateY(-15px) rotate(-5deg); }
+    40%  { transform: translateY(0) rotate(4deg); }
+    62%  { transform: translateY(-7px) rotate(-2deg); }
+    82%  { transform: translateY(0) rotate(1deg); }
+    100% { transform: translateY(0) rotate(0deg); }
+  }
   @media (max-width: 600px) {
     .doggo-egg { width: 165px; right: 8px; }
     .doggo-msg { font-size: 12px; max-width: 160px; }
@@ -1627,7 +1645,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.11.0</span>
+  <span class="version" id="versionTag">v1.11.1</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -1753,8 +1771,17 @@
     <ellipse cx="158" cy="92" rx="52" ry="44" fill="#f7e9cd"/>
     <ellipse cx="150" cy="112" rx="34" ry="26" fill="#fdf7ea"/>
     <!-- 감은 눈 (스르륵 자는 중) -->
-    <path d="M132 88 q9 8 18 0" stroke="#5a4632" stroke-width="3.4" fill="none" stroke-linecap="round"/>
-    <path d="M172 88 q9 8 18 0" stroke="#5a4632" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    <g class="d-eye-closed">
+      <path d="M132 88 q9 8 18 0" stroke="#5a4632" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+      <path d="M172 88 q9 8 18 0" stroke="#5a4632" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    </g>
+    <!-- 뜬 눈 (깨어날 때 교체된다) -->
+    <g class="d-eye-open">
+      <ellipse cx="141" cy="86" rx="6.5" ry="7.8" fill="#4b3b33"/>
+      <ellipse cx="181" cy="86" rx="6.5" ry="7.8" fill="#4b3b33"/>
+      <circle cx="143.4" cy="83.2" r="2.4" fill="#fff"/>
+      <circle cx="183.4" cy="83.2" r="2.4" fill="#fff"/>
+    </g>
     <!-- 코 · 입 -->
     <ellipse cx="152" cy="112" rx="10" ry="7.5" fill="#4b3b33"/>
     <path d="M152 120 v6" stroke="#8a7565" stroke-width="2.4" stroke-linecap="round"/>
@@ -4502,6 +4529,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.11.1', notes: '🐶 강아지에게 이름이 생겼어요 — 뭉치! 멘트가 12종으로 늘고 자는 동안 6초마다 계속 바뀝니다(한 바퀴 도는 동안 같은 멘트가 반복되지 않아요). 다시 플레이하면 뭉치가 눈을 번쩍 뜨고 화들짝 놀라며 인사한 뒤 자리를 뜹니다' },
     { v: 'v1.11.0', notes: '🛒 상점이 노드형으로 바뀌었습니다 — 아무 때나 들어가는 대신 8·13·18·23·28·33장에 도달하면 자동으로 열립니다. 매 방문마다 7종 중 4종만 진열되고(방어 아이템 최소 1개 보장), "다음 상점까지 N장"이 표시돼 자원을 지금 쓸지 아껴둘지 고민하게 됩니다' },
     { v: 'v1.10.1', notes: '튜토리얼 — 틀린 뒤 곧바로 룰렛으로 넘어가지 않고, 카드 아래에서 "업/다운은 언제든 틀릴 수 있다"를 먼저 설명합니다 · 마지막 단계의 색 동그라미에 마우스를 올리면 세트 효과를 볼 수 있습니다 · 🐶 이스터에그가 한 번도 안 나오던 문제 수정(튜토리얼 중 등장 시각이 지나면 예약이 소멸해 이후로 영영 안 떴습니다) · 강아지 말풍선이 얼굴을 가리지 않게 위로 이동' },
     { v: 'v1.10.0', notes: '시작 화면 제거 — 첫 방문은 곧바로 튜토리얼, 재방문은 곧바로 게임으로 진입합니다(규칙 설명은 튜토리얼과 완료 요약이 대신하고, 다시 보려면 ❓ 도움말). 튜토리얼이 매번 다시 뜨던 문제도 수정 — 이전엔 한 판을 완주해야만 기록돼서, 튜토리얼을 다 보고도 판 도중에 새로고침하면 또 떴습니다' },
@@ -4940,34 +4968,96 @@
     const egg = document.getElementById('doggoEgg');
     const msgEl = document.getElementById('doggoMsg');
     if (!egg) return;
+    // 자는 동안 도는 멘트들 (강아지 이름: 뭉치)
     const MESSAGES = [
-      '💤 딜러가 조는 사이에 한 판 더?',
-      '🐶 …쿨쿨. 깨우지 마세요.',
+      '💤 뭉치가 딜러 의자에서 졸고 있어요…',
+      '🐶 뭉치: …쿨쿨. 깨우지 마세요.',
       '💤 카드는 도망 안 가요. 천천히 오세요.',
-      '🐾 몰래 카드를 봤지만 아무한테도 말 안 할게요.',
+      '🐾 뭉치가 몰래 카드를 봤지만 비밀로 할게요.',
       '💤 여기서 자면 안 되는 거 아는데… 조금만요.',
-      '🐶 돌아오면 같이 이어서 해요!',
+      '🐶 돌아오면 뭉치랑 같이 이어서 해요!',
+      '🦴 뭉치는 간식 꿈을 꾸는 중…',
+      '💭 뭉치의 꿈속에선 전부 럭키세븐이래요.',
+      '🐾 조용… 방금 뭉치 꼬리가 살짝 움직였어요.',
+      '💤 뭉치가 총알을 빼놨을지도 몰라요. (아마도)',
+      '🐶 뭉치: 오늘 운은 제가 맡아둘게요.',
+      '💤 한 판만 더 하려 했는데 뭉치가 먼저 잠들었네요.',
+    ];
+    // 유저가 다시 플레이할 때 눈 뜨며 한마디
+    const WAKE_MESSAGES = [
+      '🐶 앗, 깼다! 뭉치가 응원할게요!',
+      '✨ 뭉치: 좋아요, 가봅시다!',
+      '🐾 뭉치가 눈을 번쩍 떴어요!',
+      '🐶 뭉치: 행운을 빌어요!',
     ];
     const MIN_VISIBLE_MS = 5000; // 등장했으면 최소 이만큼은 보여준다 (깜빡 사라짐 방지)
+    const MSG_ROTATE_MS = 6000;  // 자는 동안 멘트를 갈아 끼우는 주기
+    const WAKE_MS = 1400;        // 눈 뜨고 화들짝 → 퇴장까지
     let idleTimer = null;
     let hideTimer = null;
-    let visits = 0;
+    let msgTimer = null;
     let shownAt = 0;
     let lastActiveAt = Date.now(); // 마지막 조작 시각 — 자리 비운 시간 계산의 기준
     const isShown = () => egg.classList.contains('show');
+    const isWaking = () => egg.classList.contains('waking');
+
+    // 셔플백: 한 바퀴 도는 동안 같은 멘트가 다시 나오지 않게 하고,
+    // 가방을 새로 채울 때 직전 멘트가 연달아 나오는 것도 막는다.
+    let bag = [];
+    let lastMsg = '';
+    function nextMessage() {
+      if (!bag.length) {
+        bag = MESSAGES.slice();
+        for (let i = bag.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [bag[i], bag[j]] = [bag[j], bag[i]];
+        }
+        if (bag[0] === lastMsg && bag.length > 1) bag.push(bag.shift());
+      }
+      lastMsg = bag.shift();
+      return lastMsg;
+    }
+    // 페이드 아웃 → 교체 → 페이드 인
+    function swapMessage(text) {
+      msgEl.classList.add('swap');
+      setTimeout(() => {
+        msgEl.textContent = text;
+        msgEl.classList.remove('swap');
+      }, 260);
+    }
+    function startMsgRotation() {
+      clearInterval(msgTimer);
+      msgTimer = setInterval(() => {
+        if (!isShown() || isWaking()) return;
+        swapMessage(nextMessage());
+      }, MSG_ROTATE_MS);
+    }
 
     function hide() {
       clearTimeout(hideTimer);
-      egg.classList.remove('show');
+      clearInterval(msgTimer);
+      egg.classList.remove('show', 'waking');
+      msgEl.classList.remove('swap');
     }
     function show() {
       // 튜토리얼 중에는 방해하지 않는다. 단, 여기서 그냥 return하면 예약이
       // 소멸해 이후로 영영 안 나타난다 — 반드시 타이머를 다시 걸어준다.
       if (document.querySelector('.tutorial-overlay.show')) { schedule(); return; }
-      msgEl.textContent = MESSAGES[visits % MESSAGES.length];
-      visits++;
+      egg.classList.remove('waking');
+      msgEl.classList.remove('swap');
+      msgEl.textContent = nextMessage();
       shownAt = Date.now();
       egg.classList.add('show');
+      startMsgRotation();
+    }
+    // 유저가 다시 플레이하면 눈을 뜨고 화들짝 놀란 뒤 자리를 뜬다
+    function wakeAndLeave() {
+      if (!isShown() || isWaking()) return;
+      clearInterval(msgTimer);
+      msgEl.classList.remove('swap');
+      msgEl.textContent = WAKE_MESSAGES[Math.floor(Math.random() * WAKE_MESSAGES.length)];
+      egg.classList.add('waking');
+      setTimeout(() => { hide(); schedule(); }, WAKE_MS);
     }
     function schedule() {
       clearTimeout(idleTimer);
@@ -4984,8 +5074,9 @@
     // 버튼·컨트롤을 실제로 조작했을 때만 "다시 플레이한다"는 신호로 본다
     function onActive() {
       if (isShown()) {
+        if (isWaking()) return; // 이미 깨어나는 중이면 그대로 둔다
         clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => { hide(); schedule(); },
+        hideTimer = setTimeout(wakeAndLeave,
           Math.max(0, MIN_VISIBLE_MS - (Date.now() - shownAt)));
         return;
       }
