@@ -1651,7 +1651,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.9.1</span>
+  <span class="version" id="versionTag">v1.9.2</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -1753,7 +1753,7 @@
 
 <button type="button" class="peek-btn" id="peekBtn">👁 화면 잠깐 보기</button>
 
-<!-- 이스터에그: 1분간 아무 입력이 없으면 강아지가 슬쩍 올라와 잔다. 아무 조작이나 하면 사라진다. -->
+<!-- 이스터에그: 30초간 아무 입력이 없으면 강아지가 슬쩍 올라와 잔다. 버튼 등 컨트롤을 조작하면 사라진다. -->
 <div class="doggo-egg" id="doggoEgg" aria-hidden="true">
   <div class="doggo-zzz">
     <span class="z z1">z</span><span class="z z2">z</span><span class="z z3">Z</span>
@@ -4518,6 +4518,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.9.2', notes: '🐶 이스터에그 조정 — 등장 대기 시간을 1분에서 30초로 단축. 빈 화면을 클릭하는 정도로는 사라지지 않고, 버튼 등 실제 컨트롤을 조작했을 때만 퇴장합니다' },
     { v: 'v1.9.1', notes: '🐶 이스터에그 수정 — 마우스를 조금만 움직여도 강아지가 바로 사라지던 문제 해결. 이제 마우스 이동·스크롤로는 사라지지 않고, 클릭·키 입력 같은 실제 조작에만 퇴장하며 최소 5초는 머뭅니다' },
     { v: 'v1.9.0', notes: '예언 표시를 카드 바로 아래 보라 글로우 배지로 이동·강조(기존엔 화면 최하단 작은 글씨라 안 보였음) + 범위 의미를 설명하는 툴팁 추가 · 🐶 이스터에그: 1분간 아무 입력이 없으면 강아지가 슬쩍 올라와 잠듭니다 (아무 조작이나 하면 사라짐)' },
     { v: 'v1.8.3', notes: '툴팁 전면 개편 — 제목+본문 구조에 축복/저주 행과 종류별 색 띠(버프 초록·저주 빨강·중립 노랑) 적용 · 카드 배지는 보유 증강과 세트 효과를 반영한 실제 획득량을 안내 · 학파 태그는 "지금 N개 → 고르면 N+1개 → 개방되는 효과"로 재작성 · 티어 라벨 설명 추가' },
@@ -4926,12 +4927,12 @@
   })();
 
   // ---------------------------------------------------------------------
-  // 이스터에그: 1분간 아무 입력이 없으면 강아지가 슬쩍 올라와 잔다.
-  // 아무 조작이나 하면 곧바로 사라지고 타이머가 다시 시작된다.
+  // 이스터에그: 30초간 아무 입력이 없으면 강아지가 슬쩍 올라와 잔다.
+  // 버튼·컨트롤을 눌러 실제로 뭔가 작동시켰을 때만 사라지고 타이머가 다시 시작된다.
   // pointer-events:none이라 플레이를 가로막지 않는다.
   // ---------------------------------------------------------------------
   (function initDoggoEgg() {
-    const IDLE_MS = 60000;
+    const IDLE_MS = 30000;
     const egg = document.getElementById('doggoEgg');
     const msgEl = document.getElementById('doggoMsg');
     if (!egg) return;
@@ -4967,12 +4968,13 @@
       idleTimer = setTimeout(show, IDLE_MS);
     }
 
-    // 마우스 이동·스크롤은 "자리에 있다"는 신호일 뿐 — 자고 있는 강아지를 쫓아내지 않는다.
-    // (이게 dismiss 트리거면 강아지를 보러 마우스를 움직이는 순간 사라져버린다)
+    // 마우스 이동·스크롤·빈 화면 클릭은 "자리에 있다"는 신호일 뿐 — 자고 있는
+    // 강아지를 쫓아내지 않는다. (강아지를 보려고 화면을 건드리는 순간
+    // 사라져버리면 이스터에그를 제대로 볼 수가 없다)
     function onPassive() {
       if (!isShown()) schedule();
     }
-    // 클릭·키 입력·터치는 실제로 다시 플레이한다는 신호 — 최소 노출 시간을 채운 뒤 보낸다
+    // 버튼·컨트롤을 실제로 조작했을 때만 "다시 플레이한다"는 신호로 본다
     function onActive() {
       if (isShown()) {
         clearTimeout(hideTimer);
@@ -4982,8 +4984,19 @@
       }
       schedule();
     }
-    ['mousemove', 'scroll'].forEach((ev) => window.addEventListener(ev, onPassive, { passive: true }));
-    ['mousedown', 'click', 'keydown', 'touchstart', 'wheel'].forEach((ev) => window.addEventListener(ev, onActive, { passive: true }));
+    // 클릭 지점이 실제로 뭔가를 작동시키는 컨트롤인지 판별한다
+    function isControl(target) {
+      return !!(target && target.closest &&
+        target.closest('button, [role="button"], a, input, select, textarea, label'));
+    }
+    function onPointer(e) {
+      if (isControl(e.target)) onActive();
+      else onPassive();
+    }
+    ['mousemove', 'scroll', 'wheel'].forEach((ev) => window.addEventListener(ev, onPassive, { passive: true }));
+    ['mousedown', 'click', 'touchstart'].forEach((ev) => window.addEventListener(ev, onPointer, { passive: true }));
+    // 키보드 ↑/↓ 는 그 자체로 게임을 진행시키는 조작이므로 바로 퇴장 신호
+    window.addEventListener('keydown', onActive, { passive: true });
     // 탭을 벗어났다 돌아오면 타이머만 다시 시작 (백그라운드에서 튀어나오지 않게)
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { hide(); clearTimeout(idleTimer); }
