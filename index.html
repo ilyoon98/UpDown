@@ -1539,24 +1539,45 @@
     right: 18px;
     bottom: 0;
     z-index: 5000;
-    width: 240px;
+    width: 300px;              /* 그림이 가로로 넓어 폭을 키워야 존재감이 산다 */
     pointer-events: none;      /* 플레이를 절대 막지 않는다 */
     opacity: 0;
     transform: translateY(120%);
     transition: opacity 0.5s ease, transform 0.85s cubic-bezier(.2,.9,.3,1.2);
   }
   .doggo-egg.show { opacity: 1; transform: translateY(6%); }
-  .doggo-svg { width: 100%; display: block; filter: drop-shadow(0 10px 22px rgba(0,0,0,0.55)); }
+  /* 잠자기/깨어나기 두 장을 겹쳐두고 크로스페이드한다 */
+  .doggo-art { position: relative; width: 100%; }
+  .doggo-img {
+    width: 100%;
+    display: block;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55));
+    transition: opacity 0.3s ease;
+  }
+  /* 깨어난 그림은 자는 그림 위에 겹치고, 쿠션 선이 어긋나지 않게 아래 정렬 */
+  .doggo-img.d-wake {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    object-fit: contain;
+    object-position: bottom;
+    opacity: 0;
+  }
+  .doggo-egg.waking .doggo-img.d-sleep { opacity: 0; }
+  .doggo-egg.waking .doggo-img.d-wake { opacity: 1; }
   /* 새근새근 숨쉬기 */
-  .doggo-egg.show .doggo-svg { animation: doggoBreathe 3.4s ease-in-out infinite; transform-origin: 50% 90%; }
+  .doggo-egg.show .doggo-art { animation: doggoBreathe 3.4s ease-in-out infinite; transform-origin: 50% 90%; }
   @keyframes doggoBreathe {
     0%, 100% { transform: scale(1); }
     50%      { transform: scale(1.035); }
   }
+  /* zzz 는 그림에 그려넣지 않고 별도 이펙트로 띄운다 (머리 위쪽) */
   .doggo-zzz {
     position: absolute;
-    top: 2px;
-    left: 34px;
+    top: -10px;
+    left: 30px;
+    z-index: 2;
     display: flex;
     align-items: flex-end;
     gap: 3px;
@@ -1575,11 +1596,11 @@
   }
   .doggo-msg {
     position: absolute;
-    /* 강아지 위쪽에 띄운다 — 예전엔 34%라 얼굴을 덮었다 */
+    /* 강아지 위쪽, 머리(그림 왼쪽)에 가깝게 띄운다 */
     bottom: 100%;
-    margin-bottom: 4px;
-    right: 0;
-    max-width: 220px;
+    margin-bottom: 6px;
+    left: 0;
+    max-width: 240px;
     background: #14141d;
     color: #ececf4;
     border: 1px solid #7a7aa0;
@@ -1597,13 +1618,10 @@
   /* 멘트 교체 시 살짝 페이드 (자는 동안 주기적으로 바뀐다) */
   .doggo-egg.show .doggo-msg.swap { opacity: 0; transform: translateY(5px); }
 
-  /* ---- 깨어나는 순간: 눈을 뜨고 화들짝 놀란 뒤 자리를 뜬다 ---- */
-  .d-eye-open { opacity: 0; }
-  .doggo-egg.waking .d-eye-closed { opacity: 0; }
-  .doggo-egg.waking .d-eye-open { opacity: 1; }
+  /* ---- 깨어나는 순간: 그림이 바뀌고 화들짝 놀란 뒤 자리를 뜬다 ---- */
   .doggo-egg.waking .doggo-zzz { opacity: 0; transition: opacity 0.25s ease; }
-  /* 숨쉬기(.show .doggo-svg)와 같은 특이도라 순서상 이 규칙이 이긴다 */
-  .doggo-egg.waking .doggo-svg { animation: doggoWake 1.15s cubic-bezier(.3,1.4,.4,1); }
+  /* 숨쉬기(.show .doggo-art)와 같은 특이도라 순서상 이 규칙이 이긴다 */
+  .doggo-egg.waking .doggo-art { animation: doggoWake 1.15s cubic-bezier(.3,1.4,.4,1); }
   @keyframes doggoWake {
     0%   { transform: translateY(0) rotate(0deg); }
     18%  { transform: translateY(-15px) rotate(-5deg); }
@@ -1613,8 +1631,12 @@
     100% { transform: translateY(0) rotate(0deg); }
   }
   @media (max-width: 600px) {
-    .doggo-egg { width: 165px; right: 8px; }
-    .doggo-msg { font-size: 12px; max-width: 160px; }
+    .doggo-egg { width: 200px; right: 8px; }
+    .doggo-msg { font-size: 12px; max-width: 170px; }
+    .doggo-zzz { left: 20px; top: -6px; }
+    .doggo-zzz .z1 { font-size: 13px; }
+    .doggo-zzz .z2 { font-size: 17px; }
+    .doggo-zzz .z3 { font-size: 22px; }
   }
 
   /* 튜토리얼 6/6의 색 세트 동그라미 — 호버하면 실제 세트 효과 툴팁이 뜬다 */
@@ -1713,7 +1735,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.13.2</span>
+  <span class="version" id="versionTag">v1.14.0</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -1820,42 +1842,10 @@
   <div class="doggo-zzz">
     <span class="z z1">z</span><span class="z z2">z</span><span class="z z3">Z</span>
   </div>
-  <svg class="doggo-svg" viewBox="0 0 220 170" xmlns="http://www.w3.org/2000/svg">
-    <!-- 분홍 쿠션 -->
-    <ellipse cx="110" cy="146" rx="104" ry="22" fill="#f2b8c6"/>
-    <ellipse cx="110" cy="141" rx="96" ry="17" fill="#f8cdd8"/>
-    <!-- 몸통 -->
-    <ellipse cx="72" cy="112" rx="62" ry="36" fill="#efdcb8"/>
-    <ellipse cx="66" cy="104" rx="52" ry="28" fill="#f7e9cd"/>
-    <!-- 앞발 -->
-    <ellipse cx="126" cy="134" rx="26" ry="10" fill="#f7e9cd"/>
-    <ellipse cx="150" cy="136" rx="16" ry="8" fill="#fdf5e6"/>
-    <!-- 귀 -->
-    <path d="M120 60 L104 22 L142 44 Z" fill="#e8cfa4"/>
-    <path d="M120 56 L110 32 L136 46 Z" fill="#d9a89a"/>
-    <path d="M186 62 L200 28 L204 66 Z" fill="#e8cfa4"/>
-    <path d="M188 62 L197 40 L199 64 Z" fill="#d9a89a"/>
-    <!-- 머리 -->
-    <ellipse cx="158" cy="92" rx="52" ry="44" fill="#f7e9cd"/>
-    <ellipse cx="150" cy="112" rx="34" ry="26" fill="#fdf7ea"/>
-    <!-- 감은 눈 (스르륵 자는 중) -->
-    <g class="d-eye-closed">
-      <path d="M132 88 q9 8 18 0" stroke="#5a4632" stroke-width="3.4" fill="none" stroke-linecap="round"/>
-      <path d="M172 88 q9 8 18 0" stroke="#5a4632" stroke-width="3.4" fill="none" stroke-linecap="round"/>
-    </g>
-    <!-- 뜬 눈 (깨어날 때 교체된다) -->
-    <g class="d-eye-open">
-      <ellipse cx="141" cy="86" rx="6.5" ry="7.8" fill="#4b3b33"/>
-      <ellipse cx="181" cy="86" rx="6.5" ry="7.8" fill="#4b3b33"/>
-      <circle cx="143.4" cy="83.2" r="2.4" fill="#fff"/>
-      <circle cx="183.4" cy="83.2" r="2.4" fill="#fff"/>
-    </g>
-    <!-- 코 · 입 -->
-    <ellipse cx="152" cy="112" rx="10" ry="7.5" fill="#4b3b33"/>
-    <path d="M152 120 v6" stroke="#8a7565" stroke-width="2.4" stroke-linecap="round"/>
-    <path d="M152 126 q-7 6 -13 1" stroke="#8a7565" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-    <path d="M152 126 q7 6 13 1" stroke="#8a7565" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-  </svg>
+  <div class="doggo-art">
+    <img class="doggo-img d-sleep" src="Sleep.png" alt="">
+    <img class="doggo-img d-wake" src="WakeUP.png" alt="">
+  </div>
   <div class="doggo-msg" id="doggoMsg"></div>
 </div>
 
@@ -4759,6 +4749,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.14.0', notes: '🐶 뭉치가 실제 일러스트로 바뀌었습니다 — 잠든 모습과 깨어난 모습 두 장을 부드럽게 크로스페이드합니다(기존 SVG 도형 대체). 💤 zzz는 그림에 그려넣지 않고 별도 이펙트로 머리 위에 띄워, 깨어날 때 함께 사라집니다' },
     { v: 'v1.13.2', notes: '🐶 뭉치가 깨는 기준을 "키를 누른 순간"에서 "그 키로 실제 무언가가 작동한 순간"으로 바꿨습니다. 예를 들어 판정이 진행 중이라 입력이 먹지 않을 때 ↑를 눌러도 아무 일이 없으므로 뭉치는 계속 잡니다' },
     { v: 'v1.13.1', notes: '🐶 뭉치가 아무 키에나 깨던 문제 수정 — 이제 실제로 뭔가 작동하는 키(플레이 가능한 ↑/↓, 열린 창을 닫는 ESC 등)에만 깨어납니다. 글자·스페이스·엔터처럼 아무 일도 일어나지 않는 키로는 계속 잡니다' },
     { v: 'v1.13.0', notes: '🔒 증강 해금 + ⬆ 증강 레벨 추가 — 강력한 3단계 7종이 조건부로 잠깁니다(예: 검은 계약은 3번 사망, 불멸의 탄창은 생존 본능+불사조 발견). 도감에서 해금 조건과 진행도를 확인할 수 있어요. 또 수치형 증강 8종은 같은 증강을 다시 골라 최대 Lv.3까지 강화됩니다(예: 카드 투시 3회→5회→8회)' },
