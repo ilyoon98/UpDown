@@ -305,24 +305,12 @@
   }
   #codexBtn:hover { background: #47476a; }
 
-  /* 상점 버튼: 크고 눈에 띄게 */
-  #shopBtn {
-    background: linear-gradient(135deg, #6b5410, #a07d12);
-    color: #ffe9b3;
-    padding: 14px 48px;
-    font-size: 18px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 209, 102, 0.4);
-  }
-  #shopBtn:hover { filter: brightness(1.15); }
-  #shopBtn.affordable {
-    background: linear-gradient(135deg, #d4a017, #ffd166);
-    color: #1e1e2e;
-    animation: shopGlow 1.4s ease infinite;
-  }
-  @keyframes shopGlow {
-    0%, 100% { box-shadow: 0 0 10px rgba(255, 209, 102, 0.4); }
-    50% { box-shadow: 0 0 26px rgba(255, 209, 102, 0.85); }
+  /* 상점 안내 문구 (노드 진입 시) */
+  .shop-sub {
+    color: #b9b9cc;
+    font-size: 14px;
+    margin: 0 0 14px;
+    text-align: center;
   }
 
   /* 색 자원 표시 바 */
@@ -582,6 +570,13 @@
   .deck-pill.gold.soon {
     animation: pulseBtn 1.2s ease infinite;
     background: rgba(255, 209, 102, 0.12);
+  }
+  /* 다음 상점까지 — 증강(금색)과 구분되는 청록 계열 */
+  .deck-pill.shop { border-color: rgba(95, 216, 196, 0.5); color: #8fd8c8; }
+  .deck-pill.shop b { color: #5fd8c4; }
+  .deck-pill.shop.soon {
+    animation: pulseBtn 1.2s ease infinite;
+    background: rgba(95, 216, 196, 0.12);
   }
   /* 덱 진행 바: 채워질수록 진행. 눈금 = 증강 등장 지점 */
   .deck-progress {
@@ -1299,7 +1294,6 @@
     .card.peeked::before { font-size: 11px; padding: 2px 8px; top: 5px; }
     .controls { gap: 10px; }
     .controls button { padding: 12px 18px; font-size: 16px; }
-    #shopBtn { padding: 12px 28px; font-size: 16px; }
     .card-peek-btn { font-size: 14px; padding: 10px 22px; margin: -8px 0 10px; }
     .combo-badge { font-size: 18px; }
     .message { font-size: 17px; }
@@ -1633,7 +1627,7 @@
 <h1>업다운 카드 게임</h1>
 
 <div class="top-utils">
-  <span class="version" id="versionTag">v1.10.1</span>
+  <span class="version" id="versionTag">v1.11.0</span>
   <button type="button" class="update-toast" id="updateToast">🔄 업데이트!</button>
   <button id="restartBtn">🔄 처음부터</button>
   <button type="button" id="codexBtn">📖 도감</button>
@@ -1674,13 +1668,13 @@
     </div>
     <p class="kbd-hint">키보드 ↑ / ↓ 로도 플레이할 수 있어요</p>
     <div class="util-row">
-      <button type="button" id="shopBtn">🛒 상점 열기</button>
     </div>
     <div class="resource-bar" id="resourceBar"></div>
 
     <div class="deck-info">
       <span class="deck-pill">🃏 남은 카드 <b id="deckCount">0</b>장</span>
       <span class="deck-pill gold" id="nextAugPill">✨ 다음 증강까지 <b id="nextAugCount">-</b>장</span>
+      <span class="deck-pill shop" id="nextShopPill">🛒 다음 상점까지 <b id="nextShopCount">-</b>장</span>
     </div>
     <div class="deck-progress" id="deckProgress"><div class="deck-progress-fill" id="deckProgressFill"></div></div>
     <div class="memory-hint" id="memoryHint"></div>
@@ -1801,9 +1795,10 @@
 <div class="codex-overlay" id="shopOverlay">
   <div class="codex-modal shop-modal">
     <h2>🛒 상점</h2>
+    <p class="shop-sub">이번 진열은 <b>4종</b>이에요. 다음 상점까지 자원을 아껴둘 수도 있어요.</p>
     <div class="shop-resources" id="shopResources"></div>
     <div class="shop-items" id="shopItems"></div>
-    <button type="button" class="codex-close" id="shopCloseBtn">닫기</button>
+    <button type="button" class="codex-close" id="shopCloseBtn">나가기 ▶</button>
   </div>
 </div>
 
@@ -2441,7 +2436,9 @@
       heatCharges: 0,            // 🔥 열기: 남은 정답 콤보 2배 횟수
       shopPurchases: {},         // 아이템별 구매 횟수 (가격 상승제)
       shopStock: {},             // 판당 재고 소비 기록
-      shopUnlocked: false,       // 총 자원 6개 이상 모이면 개방
+      triggeredShops: new Set(), // 이미 방문한 상점 시점
+      shopOffer: [],             // 이번 방문에 진열된 품목 id (로테이션)
+      shopVisits: 0,             // 방문 횟수 (표시용)
     };
   }
   let augmentState = createInitialAugmentState();
@@ -2509,6 +2506,8 @@
   const deckProgressEl = document.getElementById('deckProgress');
   const nextAugPill = document.getElementById('nextAugPill');
   const nextAugCount = document.getElementById('nextAugCount');
+  const nextShopPill = document.getElementById('nextShopPill');
+  const nextShopCount = document.getElementById('nextShopCount');
   const spinFunBtn = document.getElementById('spinFunBtn');
   const cardPeekBtn = document.getElementById('cardPeekBtn');
   let cylinderRotation = 0;
@@ -3050,6 +3049,7 @@
     renderMemoryHint();
     renderProphecyHint();
     renderNextAugmentHint();
+    renderNextShopHint();
     refreshCardPeekUI();
     refreshOddsUI();
     renderOwnedAugments();
@@ -4155,6 +4155,7 @@
       }
 
       await maybeOfferAugment(prevCardCount, augmentState.cardsAdvanced);
+      await maybeOpenShop(prevCardCount, augmentState.cardsAdvanced);
       setChoiceButtons(true);
       setRoundBusy(false);
     }, 900);
@@ -4188,21 +4189,40 @@
     { id: 'immunity', name: '💠 죽음 면역 +1', desc: '어떤 죽음이든 1회 무효 (검은 계약 즉사 제외)', base: { red: 1, blue: 1, green: 1, yellow: 1 }, stock: 1, buy(s) { grantProtection('immunity'); } },
   ];
 
-  // 상점 개방: 총 자원 6개 이상 모이면 열린다(§6 — 첫 판 정보 과부하 방지)
-  const SHOP_OPEN_THRESHOLD = 6;
+  // 상점은 "노드"다 — 정해진 카드 수에 도달하면 자동으로 열리고, 그 외에는
+  // 들어갈 수 없다. 증강 시점(3·6·10·15·20·25·30·35)과 겹치지 않게 사이에
+  // 배치해 [증강 → 플레이 → 상점 → 플레이] 리듬을 만든다.
+  const SHOP_THRESHOLDS = [8, 13, 18, 23, 28, 33];
+  // 한 번에 진열할 품목 수 (슬더스식 재고 로테이션)
+  const SHOP_SLOTS = 4;
+  // 최소 1개는 보장되는 방어 계열 — 운이 나빠도 살길은 남겨둔다
+  const SHOP_DEFENSIVE = ['shield', 'remove', 'immunity', 'cleanse'];
+
+  // 이번 방문에 진열할 품목을 뽑는다. 품절(재고 0)은 후보에서 빼고,
+  // 방어 아이템 최소 1개를 보장한 뒤 나머지를 무작위로 채운다.
+  function rollShopOffer() {
+    const pool = SHOP_ITEMS.filter((it) => itemStockLeft(it) > 0);
+    if (pool.length <= SHOP_SLOTS) return pool.map((it) => it.id);
+    const picked = [];
+    const defensive = pool.filter((it) => SHOP_DEFENSIVE.includes(it.id));
+    if (defensive.length) {
+      picked.push(defensive[Math.floor(Math.random() * defensive.length)]);
+    }
+    const rest = pool.filter((it) => !picked.includes(it));
+    while (picked.length < SHOP_SLOTS && rest.length) {
+      picked.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
+    }
+    return picked.map((it) => it.id);
+  }
 
   const shopOverlay = document.getElementById('shopOverlay');
   const shopResources = document.getElementById('shopResources');
   const shopItems = document.getElementById('shopItems');
-  const shopBtn = document.getElementById('shopBtn');
   const shopCloseBtn = document.getElementById('shopCloseBtn');
   const resourceBar = document.getElementById('resourceBar');
 
   function totalResources() {
     return Object.values(augmentState.resources).reduce((a, b) => a + b, 0);
-  }
-  function shopUnlocked() {
-    return augmentState.shopUnlocked || totalResources() >= SHOP_OPEN_THRESHOLD;
   }
 
   // 현재 비용 = 기본 비용 + 구매 횟수(같은 아이템 살수록 첫 색이 +1씩)
@@ -4243,24 +4263,21 @@
       pill.textContent = `${RESOURCE_ICON[c]} ${augmentState.resources[c]}`;
       resourceBar.appendChild(pill);
     });
-    // 상점이 방금 열렸으면 개방 연출
-    if (augmentState.shopUnlocked !== true && shopUnlocked()) {
-      augmentState.shopUnlocked = true;
-      const r = shopBtn.getBoundingClientRect();
-      fx.float(r.left + r.width / 2, r.top, '🛒 상점이 열렸어요!', '#ffd166', 24);
-      fx.burst(r.left + r.width / 2, r.top + r.height / 2, { count: 26, colors: ['#ffd166', '#ffe9b3', '#fff'], spread: 120 });
-      fx.confetti(24);
-      sfx('legendary');
+  }
+
+  // "다음 상점까지 N장" — 자원을 지금 쓸지 아껴둘지 판단할 근거를 준다
+  function renderNextShopHint() {
+    const advanced = augmentState.cardsAdvanced;
+    const next = SHOP_THRESHOLDS.find(
+      (t) => t > advanced && !augmentState.triggeredShops.has(t)
+    );
+    if (next === undefined) {
+      nextShopPill.style.display = 'none';
+      return;
     }
-    const unlocked = augmentState.shopUnlocked === true;
-    // 상점 버튼은 항상 보이되, 개방 전엔 잠김 상태로 남은 자원 수를 안내
-    shopBtn.disabled = !unlocked;
-    if (unlocked) {
-      shopBtn.textContent = '🛒 상점 열기';
-    } else {
-      shopBtn.textContent = `🔒 상점 (자원 ${totalResources()}/${SHOP_OPEN_THRESHOLD})`;
-    }
-    shopBtn.classList.toggle('affordable', unlocked && SHOP_ITEMS.some((it) => canBuy(it)));
+    nextShopPill.style.display = '';
+    nextShopCount.textContent = next - advanced;
+    nextShopPill.classList.toggle('soon', next - advanced <= 1);
   }
 
   function renderShop() {
@@ -4272,7 +4289,9 @@
       shopResources.appendChild(pill);
     });
     shopItems.innerHTML = '';
-    SHOP_ITEMS.forEach((item) => {
+    // 이번 방문에 진열된 품목만 보여준다 (재고 로테이션)
+    const offered = SHOP_ITEMS.filter((it) => augmentState.shopOffer.includes(it.id));
+    offered.forEach((item) => {
       const cost = itemCost(item);
       const stockLeft = itemStockLeft(item);
       const soldOut = stockLeft <= 0;
@@ -4311,14 +4330,36 @@
     renderAll();
   }
 
-  shopBtn.addEventListener('click', () => {
-    renderShop();
-    shopOverlay.classList.add('show');
-  });
-  shopCloseBtn.addEventListener('click', () => shopOverlay.classList.remove('show'));
-  shopOverlay.addEventListener('click', (e) => {
-    if (e.target === shopOverlay) shopOverlay.classList.remove('show');
-  });
+  // 상점 노드: 열고 나서 '나가기'를 누를 때까지 게임 진행을 멈춘다.
+  // (증강 선택과 같은 방식 — 바깥 클릭으로는 닫히지 않게 해 실수로 넘기는 걸 막는다)
+  let shopResolver = null;
+  function openShopNode() {
+    return new Promise((resolve) => {
+      shopResolver = resolve;
+      augmentState.shopVisits++;
+      augmentState.shopOffer = rollShopOffer();
+      renderShop();
+      shopOverlay.classList.add('show');
+      sfx('legendary');
+      fx.confetti(24);
+    });
+  }
+  function closeShopNode() {
+    shopOverlay.classList.remove('show');
+    if (shopResolver) { const r = shopResolver; shopResolver = null; r(); }
+  }
+  shopCloseBtn.addEventListener('click', closeShopNode);
+
+  // 상점 시점을 지났으면 방문시킨다 (증강의 maybeOfferAugment와 같은 구조)
+  async function maybeOpenShop(prevCount, newCount) {
+    for (const threshold of SHOP_THRESHOLDS) {
+      if (threshold <= prevCount || threshold > newCount) continue;
+      if (augmentState.triggeredShops.has(threshold)) continue;
+      augmentState.triggeredShops.add(threshold);
+      await openShopNode();
+      renderAll();
+    }
+  }
 
   // ---------------------------------------------------------------------
   // 증강 도감: 16종 전체를 티어별로 정리해서 보여준다
@@ -4362,7 +4403,7 @@
     // 상점 안내
     const shopTitle = document.createElement('div');
     shopTitle.className = 'codex-tier-title t2';
-    shopTitle.textContent = '🛒 상점 (자원 6개 이상 모이면 개방 · 살수록 가격 +1)';
+    shopTitle.textContent = `🛒 상점 (${SHOP_THRESHOLDS.join('·')}장에 열림 · 매번 ${SHOP_SLOTS}종만 진열 · 살수록 가격 +1)`;
     codexBody.appendChild(shopTitle);
     SHOP_ITEMS.forEach((item) => {
       const costText = Object.entries(item.base).map(([c, n]) => `${RESOURCE_ICON[c]}×${n}`).join(' ');
@@ -4461,6 +4502,7 @@
   // 버전 로그 (최신이 위)
   // ---------------------------------------------------------------------
   const CHANGELOG = [
+    { v: 'v1.11.0', notes: '🛒 상점이 노드형으로 바뀌었습니다 — 아무 때나 들어가는 대신 8·13·18·23·28·33장에 도달하면 자동으로 열립니다. 매 방문마다 7종 중 4종만 진열되고(방어 아이템 최소 1개 보장), "다음 상점까지 N장"이 표시돼 자원을 지금 쓸지 아껴둘지 고민하게 됩니다' },
     { v: 'v1.10.1', notes: '튜토리얼 — 틀린 뒤 곧바로 룰렛으로 넘어가지 않고, 카드 아래에서 "업/다운은 언제든 틀릴 수 있다"를 먼저 설명합니다 · 마지막 단계의 색 동그라미에 마우스를 올리면 세트 효과를 볼 수 있습니다 · 🐶 이스터에그가 한 번도 안 나오던 문제 수정(튜토리얼 중 등장 시각이 지나면 예약이 소멸해 이후로 영영 안 떴습니다) · 강아지 말풍선이 얼굴을 가리지 않게 위로 이동' },
     { v: 'v1.10.0', notes: '시작 화면 제거 — 첫 방문은 곧바로 튜토리얼, 재방문은 곧바로 게임으로 진입합니다(규칙 설명은 튜토리얼과 완료 요약이 대신하고, 다시 보려면 ❓ 도움말). 튜토리얼이 매번 다시 뜨던 문제도 수정 — 이전엔 한 판을 완주해야만 기록돼서, 튜토리얼을 다 보고도 판 도중에 새로고침하면 또 떴습니다' },
     { v: 'v1.9.3', notes: '🐶 이스터에그 — 탭을 옮기거나 다른 창을 띄워 자리를 비운 시간도 쉬는 시간으로 칩니다. 충분히 자리를 비웠다 돌아오면 강아지가 이미 자고 있고, 자던 강아지는 탭을 옮겨도 그대로 남아 있습니다' },
